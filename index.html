@@ -2917,6 +2917,7 @@ function renderWithFootnotes(mdText) {
 
 // ── B5 BOOK PREVIEW (전체 미리보기 재정의) ──
 function renderPreview() {
+  try {
   document.getElementById('preview-book-title').textContent = '';
   document.getElementById('preview-book-sub').textContent = '';
   const container = document.getElementById('preview-chapters');
@@ -2979,13 +2980,27 @@ function renderPreview() {
     getChildren(ch.id).forEach(child => renderChapterPage(child, depth+1));
   }
 
-  getChildren(null).forEach(ch => renderChapterPage(ch, 0));
+  // 디버그: 챕터 목록과 내용 유무 확인
+  const roots = getChildren(null);
+  let debugInfo = `<div style="background:#fff3cd;border:1px solid #ffc107;padding:12px;margin-bottom:12px;font-size:12px;border-radius:6px;">
+    <strong>🔍 디버그 (수정 후 삭제 예정)</strong><br>
+    전체 챕터 수: ${state.chapters.length}<br>
+    루트 챕터 수: ${roots.length}<br>
+    ${roots.map(ch => `[lv${ch.level}] ${ch.title.substring(0,20)} — 내용: ${ch.content ? ch.content.length+'자' : '없음'}`).join('<br>')}
+  </div>`;
+  html = debugInfo + html;
+
+  roots.forEach(ch => renderChapterPage(ch, 0));
 
   container.innerHTML = html;
 
   // 기존 preview-book 스타일 제거 (B5 페이지 직접 사용)
   const wrap = document.querySelector('.preview-book');
   if (wrap) { wrap.style.maxWidth = 'none'; wrap.style.background = 'none'; wrap.style.border = 'none'; wrap.style.padding = '20px 0'; wrap.style.boxShadow = 'none'; }
+  } catch(err) {
+    document.getElementById('preview-chapters').innerHTML =
+      `<div style="color:red;padding:20px;"><strong>미리보기 오류:</strong><br>${err.message}<br><pre>${err.stack}</pre></div>`;
+  }
 }
 
 // ── WORD (DOCX) EXPORT — JSZip 기반 ──
