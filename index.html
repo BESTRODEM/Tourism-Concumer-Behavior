@@ -603,8 +603,8 @@
     <!-- 오른쪽: 로그인 폼 -->
     <div class="login-box">
       <div class="login-book-header">
-        <div class="login-book-title" id="login-book-title">소비자행동론</div>
-        <div class="login-book-sub" id="login-book-sub">공동 집필 프로젝트</div>
+        <div class="login-book-title" id="login-book-title">관광소비자행동론</div>
+        <div class="login-book-sub" id="login-book-sub">Tourism Consumer Behavior<br>심리, 선택, 시장을 읽는 통합적 이해</div>
       </div>
       <div class="login-divider"></div>
       <div class="login-label">집필진으로 로그인</div>
@@ -626,7 +626,7 @@
 
 <!-- TOP NAV -->
 <nav>
-  <div class="nav-title" onclick="editBookTitle()">📖 <span id="nav-book-title">소비자행동론</span></div>
+  <div class="nav-title" onclick="editBookTitle()">📖 <span id="nav-book-title">관광소비자행동론</span></div>
   <div class="nav-spacer"></div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('dashboard')">대시보드</button>
@@ -897,9 +897,9 @@
       <label>단원 수준</label>
       <select id="input-ch-level" onchange="onChLevelChange()">
         <option value="1">🟦 대단원 (관리자 전용)</option>
-        <option value="2" selected>🟩 소단원</option>
-        <option value="3">🟨 소소단원</option>
-        <option value="4">🟪 소소소단원</option>
+        <option value="2" selected>🟩 중단원</option>
+        <option value="3">🟨 소단원</option>
+        <option value="4">🟪 소소단원</option>
       </select>
     </div>
     <div class="form-group" id="ch-parent-group">
@@ -987,7 +987,7 @@
       <div style="display:flex;align-items:center;gap:10px;padding:10px 0 10px 24px;border-bottom:1px solid var(--border);">
         <span style="width:12px;height:12px;border-radius:3px;background:#22c55e;flex-shrink:0;"></span>
         <div>
-          <div style="font-weight:700;color:var(--text);">🟩 소단원 <span style="font-size:11px;background:#dcfce7;color:#166534;padding:2px 6px;border-radius:4px;margin-left:4px;">담당 집필진</span></div>
+          <div style="font-weight:700;color:var(--text);">🟩 중단원 <span style="font-size:11px;background:#dcfce7;color:#166534;padding:2px 6px;border-radius:4px;margin-left:4px;">담당 집필진</span></div>
           <div style="color:var(--muted);margin-top:2px;">대단원 아래 장(章) 단위. 배정된 집필진이 내용 작성·상태 변경 가능. 하위 단원도 직접 추가 가능.</div>
           <div style="font-family:monospace;font-size:12px;color:#22c55e;margin-top:4px;">예) 제1장. 소비자행동의 개념과 의의</div>
         </div>
@@ -995,22 +995,22 @@
       <div style="display:flex;align-items:center;gap:10px;padding:10px 0 10px 48px;border-bottom:1px solid var(--border);">
         <span style="width:12px;height:12px;border-radius:3px;background:#f59e0b;flex-shrink:0;"></span>
         <div>
-          <div style="font-weight:700;color:var(--text);">🟨 소소단원 <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:4px;margin-left:4px;">담당 집필진</span></div>
-          <div style="color:var(--muted);margin-top:2px;">소단원 내 절(節) 단위. 해당 소단원 담당 집필진이 추가·수정·삭제 가능.</div>
+          <div style="font-weight:700;color:var(--text);">🟨 소단원 <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:4px;margin-left:4px;">담당 집필진</span></div>
+          <div style="color:var(--muted);margin-top:2px;">중단원 내 절(節) 단위. 해당 중단원 담당 집필진이 추가·수정·삭제 가능.</div>
           <div style="font-family:monospace;font-size:12px;color:#f59e0b;margin-top:4px;">예) 제1절. 소비자행동의 정의</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;padding:10px 0 0 72px;">
         <span style="width:12px;height:12px;border-radius:3px;background:#8b5cf6;flex-shrink:0;"></span>
         <div>
-          <div style="font-weight:700;color:var(--text);">🟪 소소소단원 <span style="font-size:11px;background:#f3e8ff;color:#6b21a8;padding:2px 6px;border-radius:4px;margin-left:4px;">담당 집필진</span></div>
-          <div style="color:var(--muted);margin-top:2px;">가장 세분화된 항(項) 단위. 소소단원 담당 집필진이 추가·수정·삭제 가능.</div>
+          <div style="font-weight:700;color:var(--text);">🟪 소소단원 <span style="font-size:11px;background:#f3e8ff;color:#6b21a8;padding:2px 6px;border-radius:4px;margin-left:4px;">담당 집필진</span></div>
+          <div style="color:var(--muted);margin-top:2px;">가장 세분화된 항(項) 단위. 소단원 담당 집필진이 추가·수정·삭제 가능.</div>
           <div style="font-family:monospace;font-size:12px;color:#8b5cf6;margin-top:4px;">예) 1. 소비자행동의 학문적 배경</div>
         </div>
       </div>
     </div>
     <div style="background:#fef3c7;border-radius:8px;padding:12px 14px;font-size:12px;color:#92400e;">
-      <strong>⚠️ 권한 요약:</strong> 대단원 → 관리자 전용 / 소·소소·소소소단원 → 배정된 집필진만 집필 가능, 미배정·다른 집필자는 🔒 잠금 표시
+      <strong>⚠️ 권한 요약:</strong> 대단원 → 관리자 전용 / 중·소·소소단원 → 배정된 집필진만 집필 가능, 미배정·다른 집필자는 🔒 잠금 표시
     </div>
     <div class="modal-actions">
       <button class="nav-btn primary" onclick="closeModal('guide')">확인</button>
@@ -1222,7 +1222,7 @@
 <script>
 // ── STATE ──
 let state = {
-  book: { title: '소비자행동론', sub: 'Consumer Behavior — 심리, 선택, 시장을 읽는 통합적 이해' },
+  book: { title: '관광소비자행동론', sub: 'Tourism Consumer Behavior 심리, 선택, 시장을 읽는 통합적 이해' },
   chapters: [],
   authors: [],
   notices: [],
@@ -1551,7 +1551,7 @@ function renderSidebar() {
 
   // 계층 트리 렌더
   const INDENT = [0, 0, 14, 26, 38]; // level 1~4 들여쓰기
-  const LEVEL_LABEL = ['','대','소','소소','소소소'];
+  const LEVEL_LABEL = ['','대','중','소','소소'];
   const LEVEL_COLOR = ['','#4f6ef7','#22c55e','#f59e0b','#8b5cf6'];
 
   function renderNode(ch, idx) {
@@ -1583,13 +1583,13 @@ function renderSidebar() {
     // 자식 렌더 (재귀) — createdAt 정렬
     const children = state.chapters.filter(c => c.parentId === ch.id)
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    children.forEach((child, ci) => renderNode(child, ci + 1));
+    children.forEach((child, ci) => renderNode(child, ci));
   }
 
   // 루트(대단원, parentId=null) 부터 createdAt 순
   const roots = state.chapters.filter(c => !c.parentId || c.parentId === null)
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  roots.forEach((ch, i) => renderNode(ch, i + 1));
+  roots.forEach((ch, i) => renderNode(ch, i));
 
   // 진행률 (소단원 이하 기준)
   const editable = state.chapters.filter(c => c.level !== 1);
@@ -1835,9 +1835,10 @@ function renderDashboard() {
   if (!total) { chDiv.innerHTML = '<div style="color:var(--muted);font-size:13px;">아직 단원이 없습니다. 단원을 추가하세요.</div>'; }
   else {
     const labels = { done: '완료', prog: '작업 중', none: '미작성' };
-    chDiv.innerHTML = state.chapters.map((ch,i) => {
+    const sortedChapters = [...state.chapters].sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+    chDiv.innerHTML = sortedChapters.map((ch,i) => {
       const wc = ch.content ? ch.content.split(/\s+/).filter(Boolean).length : 0;
-      const maxWc = Math.max(...state.chapters.map(c => (c.content||'').split(/\s+/).filter(Boolean).length), 1);
+      const maxWc = Math.max(...sortedChapters.map(c => (c.content||'').split(/\s+/).filter(Boolean).length), 1);
       const pct = Math.round(wc / maxWc * 100);
       const a = state.authors.find(a => a.id === ch.authorId);
       return `
@@ -1994,7 +1995,7 @@ function populateAuthorSelect(selectId, selectedId) {
 }
 
 function saveBookTitle() {
-  state.book.title = document.getElementById('input-book-title').value.trim() || '소비자행동론';
+  state.book.title = document.getElementById('input-book-title').value.trim() || '관광소비자행동론';
   state.book.sub = document.getElementById('input-book-sub').value.trim();
   save();
   document.getElementById('nav-book-title').textContent = state.book.title;
@@ -2798,7 +2799,7 @@ function showLoginScreen() {
     if (placeholder) placeholder.style.display = 'flex';
   }
   document.getElementById('login-book-title').textContent = state.book.title;
-  document.getElementById('login-book-sub').textContent = state.book.sub || '';
+  document.getElementById('login-book-sub').innerHTML = 'Tourism Consumer Behavior<br>심리, 선택, 시장을 읽는 통합적 이해';
   renderLoginAuthors();
 }
 
@@ -2937,25 +2938,30 @@ function renderPreview() {
   document.getElementById('preview-book-sub').textContent = '';
   const container = document.getElementById('preview-chapters');
 
-  // 루트 → 계층 순서대로 정렬
+  // 루트 → 계층 순서대로 정렬 (createdAt 기준)
   function getChildren(parentId) {
-    return state.chapters.filter(c => (c.parentId || null) === (parentId || null));
+    return state.chapters
+      .filter(c => (c.parentId || null) === (parentId || null))
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   }
 
   let html = '';
 
-  // 표지 페이지
-  const coverSrc = localStorage.getItem('book-cover-url') || localStorage.getItem('book-cover');
+  // 표지 페이지 — 이미지가 있으면 이미지만, 없으면 텍스트 제목 표시
+  const coverSrc = state.coverUrl || localStorage.getItem('book-cover-url') || localStorage.getItem('book-cover');
   html += `<div class="b5-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
-    ${coverSrc ? `<img src="${coverSrc}" style="max-width:100%;max-height:180mm;border-radius:4pt;box-shadow:0 4px 16px rgba(0,0,0,.15);margin-bottom:20pt;">` : `<div style="font-size:48pt;margin-bottom:20pt;">📖</div>`}
-    <div style="font-size:22pt;font-weight:800;margin-bottom:8pt;">${escHtml(state.book.title)}</div>
-    <div style="font-size:11pt;color:#555;">${escHtml(state.book.sub||'')}</div>
+    ${coverSrc
+      ? `<img src="${coverSrc}" style="max-width:100%;max-height:220mm;border-radius:4pt;box-shadow:0 4px 16px rgba(0,0,0,.15);">`
+      : `<div style="font-size:48pt;margin-bottom:20pt;">📖</div>
+         <div style="font-size:22pt;font-weight:800;margin-bottom:8pt;">${escHtml(state.book.title)}</div>
+         <div style="font-size:11pt;color:#555;">${escHtml(state.book.sub||'')}</div>`
+    }
   </div>`;
 
   // 재귀 렌더
   function renderChapterPage(ch, depth) {
     const a = state.authors.find(a => a.id === ch.authorId);
-    const levelNames = ['','대단원','소단원','소소단원','소소소단원'];
+    const levelNames = ['','대단원','중단원','소단원','소소단원'];
     const lv = ch.level || 1;
     const isEmpty = !ch.content || !ch.content.trim();
 
@@ -3157,13 +3163,17 @@ async function downloadMyChapterDocx() {
   if (!window.JSZip) { alert('Word 라이브러리(JSZip) 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
   const author = state.authors.find(a => a.id === currentUserId);
   const authorName = author ? author.name : (isAdmin ? '관리자' : '집필자');
+  // 현재 선택된 챕터와 그 하위 챕터만 수집
+  const rootChapter = state.chapters.find(c => c.id === state.currentChapterId);
+  if (!rootChapter) { alert('먼저 단원을 선택해주세요.'); return; }
   const myChapters = [];
   function collect(parentId) {
     state.chapters.filter(c => (c.parentId||null) === (parentId||null))
       .sort((a,b) => new Date(a.createdAt)-new Date(b.createdAt))
-      .forEach(ch => { if (canEdit(ch) || isAdmin) myChapters.push(ch); collect(ch.id); });
+      .forEach(ch => { myChapters.push(ch); collect(ch.id); });
   }
-  collect(null);
+  myChapters.push(rootChapter);
+  collect(rootChapter.id);
   if (!myChapters.length) { alert('작성된 단원이 없습니다.'); return; }
   let body = `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="48"/></w:rPr><w:t>${escXml(state.book.title)}</w:t></w:r></w:p>`;
   if (state.book.sub) body += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="24"/><w:color w:val="555555"/></w:rPr><w:t>${escXml(state.book.sub)}</w:t></w:r></w:p>`;
