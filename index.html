@@ -1872,24 +1872,7 @@ function renderDashboard() {
 }
 
 // ── BOOK PREVIEW ──
-function renderPreview() {
-  document.getElementById('preview-book-title').textContent = state.book.title;
-  document.getElementById('preview-book-sub').textContent = state.book.sub || '';
-  const container = document.getElementById('preview-chapters');
-  container.innerHTML = state.chapters.map((ch, i) => {
-    const a = state.authors.find(a => a.id === ch.authorId);
-    const body = ch.content ? marked.parse(ch.content) : '<p class="preview-chapter-empty">내용이 아직 없습니다.</p>';
-    return `
-    <div class="preview-chapter">
-      <div class="preview-chapter-head">
-        <div class="preview-chapter-num">제 ${i+1} 단원</div>
-        <div class="preview-chapter-title">${ch.title || '(제목 없음)'}</div>
-        ${a ? `<div class="preview-chapter-author">저자: ${a.name}${a.role ? ' · ' + a.role : ''}</div>` : ''}
-      </div>
-      <div class="preview-chapter-body">${body}</div>
-    </div>`;
-  }).join('<hr style="border:none;border-top:1px solid var(--border);margin:0 0 48px;">');
-}
+// renderPreview는 아래 B5 버전(2935줄 근처)이 사용됩니다.
 
 // ── AUTHORS ──
 function renderAuthors() {
@@ -2974,9 +2957,16 @@ function renderPreview() {
       </div>`;
     } else {
       // 내용 있는 대단원 or 중단원 이하 = 본문 페이지
-      const bodyHtml = isEmpty
-        ? `<p class="b5-empty">(내용이 아직 없습니다.)</p>`
-        : renderWithFootnotes(ch.content);
+      let bodyHtml;
+      if (isEmpty) {
+        bodyHtml = `<p class="b5-empty">(내용이 아직 없습니다.)</p>`;
+      } else {
+        try {
+          bodyHtml = renderWithFootnotes(ch.content);
+        } catch(e) {
+          bodyHtml = marked ? marked.parse(ch.content) : `<pre>${escHtml(ch.content)}</pre>`;
+        }
+      }
       const indent = lv > 2 ? `margin-left:${(lv-2)*14}pt;` : '';
       html += `<div class="b5-page">
         <div class="b5-chapter-num" style="${indent}">${levelNames[lv]}</div>
