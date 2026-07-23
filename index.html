@@ -637,6 +637,7 @@
           <input type="password" id="login-pin-input" placeholder="PIN" onkeydown="if(event.key==='Enter')confirmAuthorLogin()" style="flex:1;padding-right:36px;">
           <button type="button" onclick="togglePinVisibility('login-pin-input',this)" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:0;line-height:1;" title="보기/숨기기">👁</button>
         </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">※ 영문 대소문자 구분</div>
         <div class="login-pin-error" id="login-pin-error">PIN이 틀렸습니다.</div>
         <button class="login-confirm-btn" onclick="confirmAuthorLogin()">로그인</button>
       </div>
@@ -655,7 +656,6 @@
     <button class="nav-tab" onclick="showPage('editor')">편집</button>
     <button class="nav-tab" onclick="showPage('preview')">전체 미리보기</button>
     <button class="nav-tab" onclick="showPage('authors')">집필진</button>
-    <button class="nav-tab" onclick="showPage('media')">🖼 미디어</button>
   </div>
   <div class="nav-spacer"></div>
   <select id="current-user-sel" onchange="setCurrentUser(this.value)"
@@ -762,6 +762,7 @@
           <option value="done">완료</option>
         </select>
         <button class="editor-tool-btn" onclick="openModal('table-editor')">⊞ 표 삽입</button>
+        <button class="editor-tool-btn" onclick="document.getElementById('media-upload-input').click()">📤 그림 업로드</button>
         <button class="editor-tool-btn" onclick="openMediaPicker()">🖼 그림 삽입</button>
         <div class="upload-area" style="padding:5px 12px;border-width:1px;display:inline-block;" onclick="document.getElementById('file-upload').click()">
           📁 파일 업로드
@@ -1130,6 +1131,7 @@
         <button type="button" onclick="togglePinVisibility('input-admin-pw',this)" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:0;line-height:1;" title="보기/숨기기">👁</button>
       </div>
     </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:4px;">※ 영문 대소문자 구분</div>
     <div id="admin-pw-error" style="color:var(--danger);font-size:12px;margin-top:-8px;display:none;">비밀번호가 틀렸습니다.</div>
     <div class="modal-actions">
       <button class="nav-btn" onclick="closeModal('admin-login')">취소</button>
@@ -2806,10 +2808,12 @@ function saveMedia(arr) {
   if (!legacyMode && db) flushMedia();
 }
 
-function handleMediaUpload(e) {
+async function handleMediaUpload(e) {
   const files = Array.from(e.target.files);
-  processMediaFiles(files);
   e.target.value = '';
+  await processMediaFiles(files);
+  // 편집 탭에서 업로드한 경우 → 그림 삽입 창 자동 오픈
+  if (currentPage === 'editor') openMediaPicker();
 }
 function handleMediaDrop(e) {
   e.preventDefault();
