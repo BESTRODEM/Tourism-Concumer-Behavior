@@ -633,7 +633,10 @@
       <!-- PIN 입력 영역 -->
       <div class="login-pin-box" id="login-pin-box">
         <label id="login-pin-label">비밀번호를 입력하세요</label>
-        <input type="password" id="login-pin-input" placeholder="PIN" onkeydown="if(event.key==='Enter')confirmAuthorLogin()">
+        <div style="position:relative;display:flex;align-items:center;">
+          <input type="password" id="login-pin-input" placeholder="PIN" onkeydown="if(event.key==='Enter')confirmAuthorLogin()" style="flex:1;padding-right:36px;">
+          <button type="button" onclick="togglePinVisibility('login-pin-input',this)" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:0;line-height:1;" title="보기/숨기기">👁</button>
+        </div>
         <div class="login-pin-error" id="login-pin-error">PIN이 틀렸습니다.</div>
         <button class="login-confirm-btn" onclick="confirmAuthorLogin()">로그인</button>
       </div>
@@ -1122,7 +1125,10 @@
     <h2>🔐 관리자 인증</h2>
     <div class="form-group">
       <label>비밀번호</label>
-      <input type="password" id="input-admin-pw" placeholder="관리자 비밀번호" onkeydown="if(event.key==='Enter')checkAdminPw()">
+      <div style="position:relative;display:flex;align-items:center;">
+        <input type="password" id="input-admin-pw" placeholder="관리자 비밀번호" onkeydown="if(event.key==='Enter')checkAdminPw()" style="flex:1;padding-right:36px;">
+        <button type="button" onclick="togglePinVisibility('input-admin-pw',this)" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:0;line-height:1;" title="보기/숨기기">👁</button>
+      </div>
     </div>
     <div id="admin-pw-error" style="color:var(--danger);font-size:12px;margin-top:-8px;display:none;">비밀번호가 틀렸습니다.</div>
     <div class="modal-actions">
@@ -2551,6 +2557,18 @@ async function uploadProfilePhoto(file, authorId) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function togglePinVisibility(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (!inp) return;
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    inp.type = 'password';
+    btn.textContent = '👁';
+  }
 }
 
 function toggleAdminMode() {
