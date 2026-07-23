@@ -2155,11 +2155,32 @@ function renderAuthors() {
     grid.innerHTML = '<div style="color:var(--muted);font-size:13px;margin-top:12px;">집필진을 추가하세요.</div>';
     return;
   }
+  const sortedChs = [...state.chapters].sort((a,b) => new Date(a.createdAt)-new Date(b.createdAt));
+
   grid.innerHTML = state.authors.map(a => {
-    const myChs = state.chapters.filter(c => c.authorId === a.id);
+    const myChs = sortedChs.filter(c => getAuthorIds(c).includes(a.id));
     const avatarHtml = a.photo
       ? `<img src="${a.photo}" alt="${a.name}">`
       : a.name[0];
+
+    const assignSection = isAdmin ? `
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;">📌 담당 단원 지정</div>
+        <div style="display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;">
+          ${sortedChs.map(ch => {
+            const checked = getAuthorIds(ch).includes(a.id);
+            const lvLabel = ['','대','중','소','소소'][ch.level||1];
+            const indent = (ch.level||1) > 1 ? `margin-left:${((ch.level||1)-1)*12}px;` : '';
+            return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;${indent}">
+              <input type="checkbox" ${checked ? 'checked' : ''}
+                onchange="toggleChapterAuthor('${ch.id}','${a.id}',this.checked)">
+              <span style="color:var(--muted);font-size:10px;flex-shrink:0;">${lvLabel}단원</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${ch.title||''}">${ch.title||'(제목없음)'}</span>
+            </label>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+
     return `
     <div class="author-card">
       <div class="author-card-top">
@@ -2174,12 +2195,29 @@ function renderAuthors() {
       <div class="author-chapters">
         ${myChs.length ? myChs.map(c=>`<span class="ch-tag">${c.title}</span>`).join('') : '<span style="font-size:12px;color:var(--muted)">담당 단원 없음</span>'}
       </div>
-      <div class="author-card-actions">
+      ${assignSection}
+      <div class="author-card-actions" style="margin-top:10px;">
         <button class="small-btn" onclick="editAuthor('${a.id}')" ${isAdmin ? '' : 'style="display:none"'}>수정</button>
         <button class="small-btn danger" onclick="deleteAuthor('${a.id}')" ${isAdmin ? '' : 'style="display:none"'}>삭제</button>
       </div>
     </div>`;
   }).join('');
+}
+
+async function toggleChapterAuthor(chapterId, authorId, assign) {
+  const ch = state.chapters.find(c => c.id === chapterId);
+  if (!ch || !isAdmin) return;
+  let ids = getAuthorIds(ch);
+  if (assign) {
+    if (!ids.includes(authorId)) ids = [...ids, authorId];
+  } else {
+    ids = ids.filter(id => id !== authorId);
+  }
+  ch.authorIds = ids;
+  ch.authorId = ids[0] || null;
+  await saveChapterDoc(ch);
+  renderSidebar();
+  renderAuthors();
 }
 
 // ── MODALS ──
