@@ -612,6 +612,34 @@
   </div>
 </div>
 
+<!-- PART SELECTION SCREEN -->
+<div id="part-select-screen" style="
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#0f1b35 0%,#1a2d5a 60%,#0d2247 100%);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:40px;">
+  <div style="text-align:center;">
+    <div style="font-size:28px;font-weight:800;color:#fff;letter-spacing:.02em;margin-bottom:6px;">관광소비자행동론</div>
+    <div style="font-size:14px;color:rgba(255,255,255,.5);">공동 집필 관리 시스템</div>
+  </div>
+  <div style="display:flex;gap:24px;">
+    <button onclick="selectPart(1)" style="
+      width:220px;padding:32px 20px;border-radius:16px;border:2px solid rgba(255,255,255,.15);
+      background:rgba(255,255,255,.07);color:#fff;cursor:pointer;transition:all .2s;text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px;">📘</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:6px;">Part 1</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.65);">소비자편</div>
+    </button>
+    <button onclick="selectPart(2)" style="
+      width:220px;padding:32px 20px;border-radius:16px;border:2px solid rgba(255,255,255,.15);
+      background:rgba(255,255,255,.07);color:#fff;cursor:pointer;transition:all .2s;text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px;">📗</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:6px;">Part 2</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.65);">공급자편</div>
+    </button>
+  </div>
+  <div style="font-size:12px;color:rgba(255,255,255,.3);">참여할 파트를 선택하세요</div>
+</div>
+
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
   <div class="login-wrap">
@@ -651,6 +679,7 @@
 <!-- TOP NAV -->
 <nav>
   <div class="nav-title" onclick="editBookTitle()">📖 <span id="nav-book-title">관광소비자행동론</span></div>
+  <span id="part-badge" style="display:none;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--accent);color:#fff;margin-left:8px;flex-shrink:0;"></span>
   <div class="nav-spacer"></div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('dashboard')">대시보드</button>
@@ -1337,6 +1366,9 @@ let fbStorage = null;
 let legacyMode = false;
 let saveDebounce = null;
 let realtimeUnsubs = [];
+let currentPart = null;        // 1 or 2
+let COLL_META = 'collab';      // Part에 따라 전환
+let COLL_CHAPTERS = 'chapters';
 
 // ── STATUS BAR ──
 function fbStatus(msg, color='#22c55e', duration=2500) {
@@ -1394,7 +1426,7 @@ function initFirebase(cfg) {
 // ── FIRESTORE LOAD ──
 async function loadFromFirestore() {
   // 메타 (책 설정, 집필진, 공지, 게시판)
-  const metaSnap = await db.collection('collab').doc('meta').get();
+  const metaSnap = await db.collection(COLL_META).doc('meta').get();
   if (metaSnap.exists) {
     const d = metaSnap.data();
     if (d.book)    state.book    = d.book;
@@ -1404,11 +1436,11 @@ async function loadFromFirestore() {
     if (d.posts)   state.posts   = d.posts;
   }
   // 챕터 (내용이 크므로 별도 컬렉션)
-  const chapSnap = await db.collection('chapters').get();
+  const chapSnap = await db.collection(COLL_CHAPTERS).get();
   state.chapters = chapSnap.docs.map(d => ({ ...d.data(), id: d.id }));
   migrateChapters();
   // 미디어 URL 목록
-  const mediaSnap = await db.collection('collab').doc('media').get();
+  const mediaSnap = await db.collection(COLL_META).doc('media').get();
   if (mediaSnap.exists) {
     localStorage.setItem('book-media-fb', JSON.stringify(mediaSnap.data().items || []));
   }
@@ -1441,7 +1473,7 @@ async function flushMeta() {
     };
     // coverUrl은 merge로 별도 저장되므로 state에 있을 때만 포함
     if (state.coverUrl) metaData.coverUrl = state.coverUrl;
-    await db.collection('collab').doc('meta').set(metaData);
+    await db.collection(COLL_META).doc('meta').set(metaData);
   } catch(e) { fbStatus('⚠️ 저장 실패: ' + e.message, '#ef4444', 3000); }
 }
 
@@ -1449,7 +1481,7 @@ async function flushMeta() {
 async function saveChapterDoc(ch) {
   if (legacyMode || !db) return;
   try {
-    await db.collection('chapters').doc(ch.id).set({
+    await db.collection(COLL_CHAPTERS).doc(ch.id).set({
       title: ch.title, level: ch.level || 1, parentId: ch.parentId || null,
       authorId: (ch.authorIds && ch.authorIds[0]) || ch.authorId || null,
       authorIds: ch.authorIds || (ch.authorId ? [ch.authorId] : []),
@@ -1465,20 +1497,20 @@ async function saveChapterDoc(ch) {
 
 async function deleteChapterDoc(id) {
   if (legacyMode || !db) return;
-  try { await db.collection('chapters').doc(id).delete(); } catch(e){}
+  try { await db.collection(COLL_CHAPTERS).doc(id).delete(); } catch(e){}
 }
 
 // 미디어 목록 Firestore 동기화
 async function flushMedia() {
   if (legacyMode || !db) return;
   const items = getFbMedia();
-  try { await db.collection('collab').doc('media').set({ items }); } catch(e){}
+  try { await db.collection(COLL_META).doc('media').set({ items }); } catch(e){}
 }
 
 // ── REALTIME LISTENERS ──
 function setupRealtimeListeners() {
   // 메타 실시간
-  const u1 = db.collection('collab').doc('meta').onSnapshot(snap => {
+  const u1 = db.collection(COLL_META).doc('meta').onSnapshot(snap => {
     if (!snap.exists || snap.metadata.hasPendingWrites) return;
     const d = snap.data();
     if (d.book)    state.book    = d.book;
@@ -1491,7 +1523,7 @@ function setupRealtimeListeners() {
     if (currentPage === 'authors') renderAuthors();
   });
   // 챕터 실시간
-  const u2 = db.collection('chapters').onSnapshot(snap => {
+  const u2 = db.collection(COLL_CHAPTERS).onSnapshot(snap => {
     if (snap.metadata.hasPendingWrites) return;
     state.chapters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     renderSidebar();
@@ -1501,7 +1533,7 @@ function setupRealtimeListeners() {
     if (currentPage === 'authors') renderAuthors();
   });
   // 미디어 목록 실시간
-  const u3 = db.collection('collab').doc('media').onSnapshot(snap => {
+  const u3 = db.collection(COLL_META).doc('media').onSnapshot(snap => {
     if (!snap.exists || snap.metadata.hasPendingWrites) return;
     const items = snap.data().items || [];
     localStorage.setItem('book-media-fb', JSON.stringify(items));
@@ -1595,11 +1627,20 @@ function init() {
 
   const loggedIn = checkSession();
   if (loggedIn) {
+    // Part + 로그인 세션 모두 복원
+    document.getElementById('part-select-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'none';
     const sel = document.getElementById('current-user-sel');
     if (currentUserId) sel.value = currentUserId;
-  } else {
+  } else if (currentPart) {
+    // Part는 선택됐지만 로그인 안 된 상태
+    document.getElementById('part-select-screen').style.display = 'none';
     showLoginScreen();
+  } else {
+    // Part 선택부터 다시
+    document.getElementById('part-select-screen').style.display = 'flex';
+    document.getElementById('login-screen').style.display = 'none';
+    return; // 아직 렌더 불필요
   }
 
   renderSidebar();
@@ -1621,15 +1662,34 @@ function setCurrentUser(id) {
   if (state.currentChapterId) renderEditorList();
 }
 
+// ── PART 선택 ──
+function selectPart(part) {
+  currentPart = part;
+  sessionStorage.setItem('current-part', part);
+  // Part 2면 별도 컬렉션 사용, Part 1은 기존 컬렉션 유지
+  COLL_META     = part === 2 ? 'collab_p2'   : 'collab';
+  COLL_CHAPTERS = part === 2 ? 'chapters_p2' : 'chapters';
+  // 상단 표시
+  const badge = document.getElementById('part-badge');
+  if (badge) { badge.textContent = `Part ${part} ${part===1?'소비자편':'공급자편'}`; badge.style.display=''; }
+  // Part 선택 화면 숨기고 로그인으로
+  document.getElementById('part-select-screen').style.display = 'none';
+  // Firebase 재연결 (컬렉션이 바뀌므로 리스너 재설정)
+  if (realtimeUnsubs.length) { realtimeUnsubs.forEach(u=>u()); realtimeUnsubs=[]; }
+  if (db) { loadFirebase(); } else { loadLegacy(); }
+}
+
 function doLogout() {
   sessionStorage.removeItem('login-user');
   sessionStorage.removeItem('login-admin');
+  sessionStorage.removeItem('current-part');
   currentUserId = null;
   isAdmin = false;
+  currentPart = null;
   pendingLoginAuthorId = null;
   document.getElementById('login-pin-box').style.display = 'none';
-  showLoginScreen();
-  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('part-select-screen').style.display = 'flex';
   updateAdminUI();
   renderSidebar();
 }
@@ -3141,7 +3201,7 @@ async function uploadCoverFile(file) {
       const url = await snap.ref.getDownloadURL();
       // state에 저장 → flushMeta가 coverUrl을 덮어쓰지 않도록
       state.coverUrl = url;
-      await db.collection('collab').doc('meta').set({ coverUrl: url }, { merge: true });
+      await db.collection(COLL_META).doc('meta').set({ coverUrl: url }, { merge: true });
       localStorage.setItem('book-cover-url', url);
       applyCoverImage(url);
       fbStatus('✓ 표지 업로드 완료', '#22c55e', 2000);
@@ -3284,12 +3344,20 @@ function checkAdminPw() {
 
 function checkSession() {
   const admin = sessionStorage.getItem('login-admin');
-  const user = sessionStorage.getItem('login-user');
+  const user  = sessionStorage.getItem('login-user');
+  const part  = sessionStorage.getItem('current-part');
+  // Part 세션 복원
+  if (part) {
+    currentPart = parseInt(part);
+    COLL_META     = currentPart === 2 ? 'collab_p2'   : 'collab';
+    COLL_CHAPTERS = currentPart === 2 ? 'chapters_p2' : 'chapters';
+    const badge = document.getElementById('part-badge');
+    if (badge) { badge.textContent = `Part ${currentPart} ${currentPart===1?'소비자편':'공급자편'}`; badge.style.display=''; }
+  }
   if (user) {
     currentUserId = user;
-    // 공동관리자이거나 순수 관리자 세션이면 isAdmin = true
     if (admin === '1') isAdmin = true;
-    return true;
+    return !!part; // Part 선택까지 완료된 경우만 true
   }
   return false;
 }
