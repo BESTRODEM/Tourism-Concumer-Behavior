@@ -641,7 +641,7 @@
 </div>
 
 <!-- LOGIN SCREEN -->
-<div id="login-screen">
+<div id="login-screen" style="display:none;">
   <div class="login-wrap">
     <!-- 왼쪽: 책 표지 -->
     <div class="login-cover-panel" id="login-cover-panel">
@@ -1571,9 +1571,22 @@ const BUILT_IN_FB_CONFIG = {
 
 // ── STARTUP ROUTER ──
 (function startup() {
+  const part = sessionStorage.getItem('current-part');
+  if (!part) {
+    // Part가 선택 안 됐으면 Part 선택 화면만 — Firebase 로드 안 함
+    document.getElementById('part-select-screen').style.display = 'flex';
+    document.getElementById('login-screen').style.display = 'none';
+    return;
+  }
+  // Part 세션 복원
+  currentPart = parseInt(part);
+  COLL_META     = currentPart === 2 ? 'collab_p2'   : 'collab';
+  COLL_CHAPTERS = currentPart === 2 ? 'chapters_p2' : 'chapters';
+  const badge = document.getElementById('part-badge');
+  if (badge) { badge.textContent = `Part ${currentPart} ${currentPart===1?'소비자편':'공급자편'}`; badge.style.display=''; }
+  // Firebase 로드
   const legacy = localStorage.getItem('fb-legacy');
   if (legacy === '1') { legacyMode = true; loadLegacy(); afterLoad(); return; }
-  // 하드코딩된 config로 자동 연결 (별도 설정 불필요)
   initFirebase(BUILT_IN_FB_CONFIG);
 })();
 
@@ -1676,7 +1689,16 @@ function selectPart(part) {
   document.getElementById('part-select-screen').style.display = 'none';
   // Firebase 재연결 (컬렉션이 바뀌므로 리스너 재설정)
   if (realtimeUnsubs.length) { realtimeUnsubs.forEach(u=>u()); realtimeUnsubs=[]; }
-  if (db) { loadFirebase(); } else { loadLegacy(); }
+  if (db) {
+    // 이미 Firebase 초기화됨 — 새 컬렉션으로 데이터 재로드
+    loadFromFirestore().then(() => { afterLoad(); setupRealtimeListeners(); })
+      .catch(() => { loadLegacy(); afterLoad(); });
+  } else {
+    // 최초 선택 — Firebase 초기화
+    const legacy = localStorage.getItem('fb-legacy');
+    if (legacy === '1') { legacyMode = true; loadLegacy(); afterLoad(); }
+    else { initFirebase(BUILT_IN_FB_CONFIG); }
+  }
 }
 
 function doLogout() {
