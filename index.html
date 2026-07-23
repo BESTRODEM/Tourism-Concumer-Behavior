@@ -1655,6 +1655,7 @@ function init() {
     // Part는 선택됐지만 로그인 안 된 상태
     document.getElementById('part-select-screen').style.display = 'none';
     showLoginScreen();
+    return; // 로그인 전엔 메인 렌더 안 함
   } else {
     // Part 선택부터 다시
     document.getElementById('part-select-screen').style.display = 'flex';
@@ -1708,6 +1709,7 @@ function selectPart(part) {
 }
 
 function doLogout() {
+  if (!confirm('정말 로그아웃 하시겠습니까?')) return;
   sessionStorage.removeItem('login-user');
   sessionStorage.removeItem('login-admin');
   sessionStorage.removeItem('current-part');
