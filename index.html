@@ -3439,6 +3439,33 @@ function renderPreview() {
     }
   </div>`;
 
+  // 집필진 소개 페이지 (표지 다음)
+  if (state.authors && state.authors.length) {
+    html += `<div class="b5-page" style="display:flex;flex-direction:column;">
+      <div style="border-bottom:2pt solid #1a2d5a;padding-bottom:10pt;margin-bottom:24pt;">
+        <div style="font-size:9pt;color:#1a2d5a;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4pt;">Contributors</div>
+        <div style="font-size:18pt;font-weight:800;color:#1a2d5a;">집필진 소개</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:10pt;font-family:inherit;">
+        <thead>
+          <tr style="background:#f0f4ff;">
+            <th style="text-align:left;padding:7pt 10pt;border-bottom:1pt solid #c8d0e8;font-weight:700;color:#1a2d5a;width:22%;">이름</th>
+            <th style="text-align:left;padding:7pt 10pt;border-bottom:1pt solid #c8d0e8;font-weight:700;color:#1a2d5a;width:46%;">소속</th>
+            <th style="text-align:left;padding:7pt 10pt;border-bottom:1pt solid #c8d0e8;font-weight:700;color:#1a2d5a;">이메일</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${state.authors.map((a, i) => `
+          <tr style="background:${i%2===0?'#fff':'#f8f9fc'};">
+            <td style="padding:7pt 10pt;border-bottom:0.5pt solid #e0e4ee;font-weight:600;">${escHtml(a.name)}</td>
+            <td style="padding:7pt 10pt;border-bottom:0.5pt solid #e0e4ee;color:#444;">${escHtml(a.affiliation||'')}</td>
+            <td style="padding:7pt 10pt;border-bottom:0.5pt solid #e0e4ee;color:#555;font-size:9pt;">${escHtml(a.email||'')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }
+
   // 재귀 렌더
   function renderChapterPage(ch, depth) {
     const chAs = state.authors.filter(a => getAuthorIds(ch).includes(a.id));
