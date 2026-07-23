@@ -1325,6 +1325,8 @@ let state = {
   notices: [],
   posts: [],
   adminPw: '1234',
+  prologue: { content: '', updatedAt: '' },
+  epilogue: { content: '', updatedAt: '' },
   currentChapterId: null,
   editingAuthorId: null,
   editingChapterId: null,
@@ -1429,11 +1431,13 @@ async function loadFromFirestore() {
   const metaSnap = await db.collection(COLL_META).doc('meta').get();
   if (metaSnap.exists) {
     const d = metaSnap.data();
-    if (d.book)    state.book    = d.book;
-    if (d.adminPw) state.adminPw = d.adminPw;
-    if (d.authors) state.authors = d.authors;
-    if (d.notices) state.notices = d.notices;
-    if (d.posts)   state.posts   = d.posts;
+    if (d.book)     state.book     = d.book;
+    if (d.adminPw)  state.adminPw  = d.adminPw;
+    if (d.authors)  state.authors  = d.authors;
+    if (d.notices)  state.notices  = d.notices;
+    if (d.posts)    state.posts    = d.posts;
+    if (d.prologue) state.prologue = d.prologue;
+    if (d.epilogue) state.epilogue = d.epilogue;
   }
   // 챕터 (내용이 크므로 별도 컬렉션)
   const chapSnap = await db.collection(COLL_CHAPTERS).get();
@@ -1464,11 +1468,13 @@ async function flushMeta() {
   if (!db) return;
   try {
     const metaData = {
-      book:    state.book,
-      adminPw: state.adminPw,
-      authors: state.authors,
-      notices: state.notices,
-      posts:   state.posts,
+      book:     state.book,
+      adminPw:  state.adminPw,
+      authors:  state.authors,
+      notices:  state.notices,
+      posts:    state.posts,
+      prologue: state.prologue,
+      epilogue: state.epilogue,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     // coverUrl은 merge로 별도 저장되므로 state에 있을 때만 포함
@@ -1774,10 +1780,33 @@ function renderSidebar() {
     children.forEach((child, ci) => renderNode(child, ci));
   }
 
+  // 프롤로그 (관리자만 편집, 항상 맨 위)
+  function renderSpecialItem(id, label, emoji) {
+    const isActive = state.currentChapterId === id;
+    const canEdit = isAdmin;
+    const div = document.createElement('div');
+    div.className = 'chapter-item' + (isActive ? ' active' : '') + (!canEdit ? ' locked' : '');
+    div.style.paddingLeft = '16px';
+    div.style.opacity = canEdit ? '1' : '0.4';
+    div.style.cursor = canEdit ? 'pointer' : 'not-allowed';
+    div.innerHTML = `
+      <span style="width:6px;height:6px;border-radius:50%;background:#9333ea;flex-shrink:0;"></span>
+      <div class="ch-info">
+        <div class="ch-num" style="color:#9333ea;">${emoji}${!canEdit?' 🔒':''}</div>
+        <div class="ch-title">${label}</div>
+      </div>`;
+    if (canEdit) div.onclick = () => selectSpecial(id);
+    list.appendChild(div);
+  }
+
+  renderSpecialItem('__prologue__', '프롤로그', '📖');
+
   // 루트(대단원, parentId=null) 부터 createdAt 순
   const roots = state.chapters.filter(c => !c.parentId || c.parentId === null)
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   roots.forEach((ch, i) => renderNode(ch, i));
+
+  renderSpecialItem('__epilogue__', '에필로그', '📕');
 
   // 진행률 (소단원 이하 기준)
   const editable = state.chapters.filter(c => c.level !== 1);
@@ -1802,6 +1831,21 @@ function selectChapter(id) {
   else renderEditorList();
 }
 
+// ── PROLOGUE / EPILOGUE 선택 ──
+function selectSpecial(id) {
+  if (!isAdmin) return;
+  if (editorDirty && state.currentChapterId && state.currentChapterId !== id) {
+    pendingNavAction = () => selectSpecial(id);
+    document.getElementById('modal-unsaved').classList.add('open');
+    return;
+  }
+  editorDirty = false;
+  state.currentChapterId = id;
+  renderSidebar();
+  if (currentPage !== 'editor') showPage('editor');
+  else renderEditorList();
+}
+
 // ── 미저장 팝업 버튼 핸들러 ──
 function unsavedSaveAndGo() {
   document.getElementById('modal-unsaved').classList.remove('open');
@@ -1815,6 +1859,26 @@ function unsavedQuit() {
 }
 
 function renderEditorList() {
+  // 프롤로그 / 에필로그 특수 처리
+  if (state.currentChapterId === '__prologue__' || state.currentChapterId === '__epilogue__') {
+    const type  = state.currentChapterId === '__prologue__' ? 'prologue' : 'epilogue';
+    const label = type === 'prologue' ? '프롤로그' : '에필로그';
+    const special = state[type] || { content: '' };
+    document.getElementById('no-chapter').style.display = 'none';
+    document.getElementById('editor-content').style.display = 'flex';
+    document.getElementById('save-btn').style.display = '';
+    document.getElementById('edit-meta-btn').style.display = 'none';
+    document.getElementById('del-btn').style.display = 'none';
+    document.getElementById('editor-status-sel').style.display = 'none';
+    document.getElementById('editor-status-badge').style.display = 'none';
+    const dlBtn = document.getElementById('download-chapter-btn');
+    if (dlBtn) dlBtn.style.display = 'none';
+    document.getElementById('editor-chapter-title').textContent = `📚 ${label} (관리자 전용)`;
+    document.getElementById('md-editor').value = special.content || '';
+    livePreview();
+    return;
+  }
+
   const ch = state.chapters.find(c => c.id === state.currentChapterId);
   const noChapter = document.getElementById('no-chapter');
   const editorContent = document.getElementById('editor-content');
@@ -2100,6 +2164,19 @@ function livePreview() {
 }
 
 function saveChapter() {
+  // 프롤로그 / 에필로그 저장
+  if (state.currentChapterId === '__prologue__' || state.currentChapterId === '__epilogue__') {
+    const type = state.currentChapterId === '__prologue__' ? 'prologue' : 'epilogue';
+    state[type].content   = document.getElementById('md-editor').value;
+    state[type].updatedAt = new Date().toISOString();
+    editorDirty = false;
+    save();
+    const btn = document.getElementById('save-btn');
+    btn.textContent = '저장됨 ✓';
+    btn.style.background = 'var(--success)';
+    setTimeout(() => { btn.textContent = '저장'; btn.style.background = ''; }, 1500);
+    return;
+  }
   const ch = state.chapters.find(c => c.id === state.currentChapterId);
   if (!ch) return;
   ch.content = document.getElementById('md-editor').value;
@@ -3466,6 +3543,15 @@ function renderPreview() {
     </div>`;
   }
 
+  // 프롤로그
+  if (state.prologue && state.prologue.content && state.prologue.content.trim()) {
+    html += `<div class="b5-page">
+      <div class="b5-chapter-num" style="color:#9333ea;">Prologue</div>
+      <div class="b5-chapter-title" style="border-bottom-color:#9333ea;">프롤로그</div>
+      <div class="b5-body">${renderWithFootnotes(state.prologue.content)}</div>
+    </div>`;
+  }
+
   // 재귀 렌더
   function renderChapterPage(ch, depth) {
     const chAs = state.authors.filter(a => getAuthorIds(ch).includes(a.id));
@@ -3508,6 +3594,15 @@ function renderPreview() {
 
   const roots = getChildren(null);
   roots.forEach(ch => renderChapterPage(ch, 0));
+
+  // 에필로그
+  if (state.epilogue && state.epilogue.content && state.epilogue.content.trim()) {
+    html += `<div class="b5-page">
+      <div class="b5-chapter-num" style="color:#9333ea;">Epilogue</div>
+      <div class="b5-chapter-title" style="border-bottom-color:#9333ea;">에필로그</div>
+      <div class="b5-body">${renderWithFootnotes(state.epilogue.content)}</div>
+    </div>`;
+  }
 
   container.innerHTML = html;
 
