@@ -1482,6 +1482,8 @@ function setupRealtimeListeners() {
     renderSidebar();
     if (currentPage === 'dashboard') renderDashboard();
     if (currentPage === 'editor' && state.currentChapterId) renderEditorList();
+    if (currentPage === 'preview') renderPreview();
+    if (currentPage === 'authors') renderAuthors();
   });
   realtimeUnsubs = [u1, u2];
   fbStatus('🔥 Firebase 연결됨', '#4f6ef7', 2000);
