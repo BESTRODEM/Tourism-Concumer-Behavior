@@ -3272,6 +3272,7 @@ function showLoginScreen() {
   document.getElementById('login-book-title').textContent = state.book.title;
   document.getElementById('login-book-sub').innerHTML = 'Tourism Consumer Behavior<br>심리, 선택, 시장을 읽는 통합적 이해';
   renderLoginAuthors();
+  document.getElementById('login-screen').style.display = 'flex';
 }
 
 function renderLoginAuthors() {
