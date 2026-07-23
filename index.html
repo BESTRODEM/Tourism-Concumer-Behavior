@@ -1608,13 +1608,13 @@ function doLogout() {
 function canAccess(ch) {
   if (isAdmin) return true;               // 관리자 = 전체 접근
   if (!currentUserId) return false;       // 미선택 = 전체 잠금
-  if (ch.level === 1) return false;       // 대단원 = 관리자 전용
-  return getAuthorIds(ch).includes(currentUserId);
+  return getAuthorIds(ch).includes(currentUserId);  // 배정된 집필진이면 레벨 무관 접근 가능
 }
-// canEdit: 수정/완료/삭제 가능한지 (접근 가능 + 대단원 아님)
+// canEdit: 수정/완료/삭제 가능한지
 function canEdit(ch) {
-  if (ch.level === 1) return isAdmin;
-  return isAdmin || getAuthorIds(ch).includes(currentUserId);
+  if (isAdmin) return true;
+  if (!currentUserId) return false;
+  return getAuthorIds(ch).includes(currentUserId);
 }
 
 // ── SIDEBAR ──
