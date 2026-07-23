@@ -230,7 +230,8 @@
   .b5-body th { background:#f0f0f0; font-weight:700; }
   .b5-body code { font-family:monospace; font-size:9pt; background:#f4f4f4; padding:1pt 4pt; border-radius:2pt; }
   .b5-body pre { background:#f4f4f4; padding:10pt; border-radius:4pt; overflow-x:auto; font-size:8.5pt; margin-bottom:8pt; }
-  .b5-body img { max-width:100%; height:auto; display:block; margin:10pt auto; border-radius:2pt; }
+  .b5-body { width:100%; box-sizing:border-box; }
+  .b5-body img { display:block; max-width:100%; max-height:180mm; width:auto; height:auto; margin:10pt auto; border-radius:2pt; object-fit:scale-down; }
   .b5-footnotes { margin-top:20pt; padding-top:10pt; border-top:0.5pt solid #bbb; font-size:8.5pt; color:#444; line-height:1.7; }
   .b5-footnotes ol { padding-left:16pt; margin:0; }
   .b5-footnotes li { margin-bottom:3pt; }
@@ -291,7 +292,16 @@
     padding: 5px 9px; border: 1px solid var(--border); border-radius: 6px;
     font-size: 13px; background: var(--bg); color: var(--text);
   }
-  .editor-area { display: flex; flex: 1; overflow: hidden; }
+  .editor-area { display: flex; flex: 1; overflow: hidden; flex-direction: column; }
+  .editor-split { display: flex; flex: 1; overflow: hidden; }
+  .feedback-panel { border-top: 2px solid var(--accent); background: var(--surface); padding: 12px 20px; max-height: 260px; overflow-y: auto; flex-shrink: 0; }
+  .feedback-panel-header { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .feedback-entry { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; }
+  .feedback-entry-header { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .feedback-entry-text { line-height: 1.6; white-space: pre-wrap; }
+  .feedback-input-row { display: flex; gap: 8px; margin-top: 8px; }
+  .feedback-input-row textarea { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; resize: none; height: 60px; background: var(--bg); color: var(--text); font-family: inherit; }
+  .feedback-input-row textarea:focus { outline: none; border-color: var(--accent); }
   .editor-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   .editor-pane-label { padding: 8px 14px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; background: var(--bg); border-bottom: 1px solid var(--border); }
   .editor-pane textarea {
@@ -311,6 +321,13 @@
   .preview-pane code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
   .preview-pane pre { background: var(--bg); padding: 16px; border-radius: 8px; overflow-x: auto; margin-bottom: 14px; }
   .preview-pane pre code { background: none; padding: 0; }
+  /* 인라인 피드백 하이라이트 */
+  .fb-anchor { background:#fff3cd; border-bottom:2px solid #f59e0b; cursor:pointer; border-radius:2px; }
+  .fb-anchor-resolved { background:#d1fae5; border-bottom:2px solid #22c55e; cursor:pointer; border-radius:2px; }
+  .fb-badge { font-size:11px; cursor:pointer; user-select:none; margin-left:2px; vertical-align:middle; }
+  #inline-fb-btn { position:fixed; background:var(--accent); color:#fff; padding:5px 12px; border-radius:6px; font-size:12px; cursor:pointer; z-index:9999; box-shadow:0 2px 8px rgba(0,0,0,.25); display:none; white-space:nowrap; }
+  #inline-fb-popup, #fb-detail-popup { position:fixed; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; z-index:10000; box-shadow:0 6px 24px rgba(0,0,0,.18); width:290px; display:none; }
+  .fb-resolved-badge { display:inline-block; background:#d1fae5; color:#166534; font-size:11px; padding:2px 7px; border-radius:10px; margin-top:6px; }
   .preview-pane img { max-width: 100%; height: auto; display: block; margin: 12px auto; border-radius: 4px; }
 
   .no-chapter { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: var(--muted); gap: 12px; }
@@ -757,15 +774,29 @@
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <div>왼쪽에서 단원을 선택하거나 새 단원을 추가하세요</div>
         </div>
-        <div id="editor-content" style="display:none;flex:1;display:none;overflow:hidden;">
-          <div class="editor-pane" style="flex:1;display:flex;flex-direction:column;">
-            <div class="editor-pane-label">마크다운 편집</div>
-            <textarea id="md-editor" placeholder="마크다운으로 내용을 입력하세요...&#10;&#10;# 제목&#10;## 소제목&#10;&#10;본문 내용..." oninput="livePreview()"></textarea>
+        <div id="editor-content" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+          <div class="editor-split">
+            <div class="editor-pane" style="flex:1;display:flex;flex-direction:column;">
+              <div class="editor-pane-label">마크다운 편집</div>
+              <textarea id="md-editor" placeholder="마크다운으로 내용을 입력하세요...&#10;&#10;# 제목&#10;## 소제목&#10;&#10;본문 내용..." oninput="livePreview()"></textarea>
+            </div>
+            <div class="editor-divider"></div>
+            <div class="editor-pane" style="flex:1;">
+              <div class="editor-pane-label">미리보기</div>
+              <div class="preview-pane" id="live-preview"></div>
+            </div>
           </div>
-          <div class="editor-divider"></div>
-          <div class="editor-pane" style="flex:1;">
-            <div class="editor-pane-label">미리보기</div>
-            <div class="preview-pane" id="live-preview"></div>
+          <!-- 관리자 피드백 패널 -->
+          <div class="feedback-panel" id="feedback-panel" style="display:none;">
+            <div class="feedback-panel-header">
+              💬 관리자 피드백
+              <span id="feedback-count" style="background:var(--accent);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;"></span>
+            </div>
+            <div id="feedback-list"></div>
+            <div class="feedback-input-row" id="feedback-input-row" style="display:none;">
+              <textarea id="feedback-textarea" placeholder="평가 또는 메시지를 입력하세요..."></textarea>
+              <button class="nav-btn primary" onclick="submitFeedback()" style="height:60px;white-space:nowrap;">등록</button>
+            </div>
           </div>
         </div>
       </div>
@@ -915,10 +946,8 @@
       <input type="text" id="input-ch-title" placeholder="예: 1장. 서론">
     </div>
     <div class="form-group">
-      <label>담당 집필자</label>
-      <select id="input-ch-author">
-        <option value="">담당자 없음</option>
-      </select>
+      <label>담당 집필자 (복수 선택 가능)</label>
+      <div id="ch-author-checks" style="display:flex;flex-direction:column;gap:6px;max-height:120px;overflow-y:auto;padding:6px;border:1px solid var(--border);border-radius:6px;"></div>
     </div>
     <div class="form-group">
       <label>진행 상태</label>
@@ -948,10 +977,8 @@
       <input type="text" id="input-che-title" placeholder="단원 제목">
     </div>
     <div class="form-group">
-      <label>담당 집필자</label>
-      <select id="input-che-author">
-        <option value="">담당자 없음</option>
-      </select>
+      <label>담당 집필자 (복수 선택 가능)</label>
+      <div id="che-author-checks" style="display:flex;flex-direction:column;gap:6px;max-height:120px;overflow-y:auto;padding:6px;border:1px solid var(--border);border-radius:6px;"></div>
     </div>
     <div class="form-group">
       <label>진행 상태</label>
@@ -1188,6 +1215,23 @@
 </div>
 
 <!-- MY PROFILE MODAL -->
+<!-- 인라인 피드백 플로팅 버튼 -->
+<div id="inline-fb-btn" onclick="openInlineFeedbackInput()">💬 피드백 추가</div>
+
+<!-- 인라인 피드백 입력 팝업 -->
+<div id="inline-fb-popup">
+  <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;">💬 인라인 피드백</div>
+  <div id="inline-fb-anchor-preview" style="font-size:11px;color:var(--muted);background:var(--bg);padding:5px 8px;border-radius:4px;margin-bottom:8px;max-height:36px;overflow:hidden;"></div>
+  <textarea id="inline-fb-text" placeholder="평가 또는 메시지를 입력하세요..." style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:13px;resize:none;height:70px;font-family:inherit;background:var(--bg);color:var(--text);"></textarea>
+  <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end;">
+    <button onclick="hideInlineFeedbackPopup()" class="nav-btn" style="font-size:12px;">취소</button>
+    <button onclick="saveInlineFeedback()" class="nav-btn primary" style="font-size:12px;">등록</button>
+  </div>
+</div>
+
+<!-- 피드백 상세 팝업 -->
+<div id="fb-detail-popup"></div>
+
 <div class="modal-overlay" id="modal-my-profile">
   <div class="modal">
     <h2>내 프로필 수정</h2>
@@ -1240,13 +1284,27 @@ let isAdmin = false;
 let currentUserId = null; // 현재 로그인한 집필자 ID (null = 미선택)
 
 // ── CHAPTER MIGRATION ── (기존 챕터에 level/parentId 자동 부여)
+// 챕터 담당자 ID 배열 반환 (구형 authorId 필드도 지원)
+function getAuthorIds(ch) {
+  if (Array.isArray(ch.authorIds)) return ch.authorIds;
+  return ch.authorId ? [ch.authorId] : [];
+}
+
 function migrateChapters() {
   let changed = false;
+  const toSave = [];
   state.chapters.forEach(ch => {
     if (ch.level === undefined) { ch.level = 1; changed = true; }
     if (ch.parentId === undefined) { ch.parentId = null; changed = true; }
+    if (!Array.isArray(ch.authorIds)) {
+      ch.authorIds = ch.authorId ? [ch.authorId] : [];
+      changed = true; toSave.push(ch);
+    }
   });
-  if (changed) save();
+  if (changed) {
+    save();
+    toSave.forEach(ch => saveChapterDoc(ch));
+  }
 }
 
 // ── FIREBASE ──
@@ -1369,8 +1427,11 @@ async function saveChapterDoc(ch) {
   try {
     await db.collection('chapters').doc(ch.id).set({
       title: ch.title, level: ch.level || 1, parentId: ch.parentId || null,
-      authorId: ch.authorId || null, status: ch.status || 'none',
+      authorId: (ch.authorIds && ch.authorIds[0]) || ch.authorId || null,
+      authorIds: ch.authorIds || (ch.authorId ? [ch.authorId] : []),
+      status: ch.status || 'none',
       content: ch.content || '', note: ch.note || '',
+      feedback: ch.feedback || [],
       createdAt: ch.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -1504,6 +1565,7 @@ function init() {
   renderSidebar();
   updateAdminUI();
   showPage('dashboard');
+  initInlineFeedback();
 }
 
 function renderUserSelector() {
@@ -1538,12 +1600,12 @@ function canAccess(ch) {
   if (isAdmin) return true;               // 관리자 = 전체 접근
   if (!currentUserId) return false;       // 미선택 = 전체 잠금
   if (ch.level === 1) return false;       // 대단원 = 관리자 전용
-  return ch.authorId === currentUserId;   // 배정된 집필자만 접근
+  return getAuthorIds(ch).includes(currentUserId);
 }
 // canEdit: 수정/완료/삭제 가능한지 (접근 가능 + 대단원 아님)
 function canEdit(ch) {
   if (ch.level === 1) return isAdmin;
-  return isAdmin || ch.authorId === currentUserId;
+  return isAdmin || getAuthorIds(ch).includes(currentUserId);
 }
 
 // ── SIDEBAR ──
@@ -1557,7 +1619,9 @@ function renderSidebar() {
   const LEVEL_COLOR = ['','#4f6ef7','#22c55e','#f59e0b','#8b5cf6'];
 
   function renderNode(ch, idx) {
-    const a = state.authors.find(a => a.id === ch.authorId);
+    const chAuthorIds = getAuthorIds(ch);
+    const chAuthors = state.authors.filter(a => chAuthorIds.includes(a.id));
+    const a = chAuthors[0];
     const accessible = canAccess(ch);
     const isActive = state.currentChapterId === ch.id;
     const level = ch.level || 1;
@@ -1575,7 +1639,7 @@ function renderSidebar() {
       <div class="ch-info">
         <div class="ch-num" style="color:${lcolor};">${LEVEL_LABEL[level]}단원 ${idx+1}${!accessible ? ' 🔒' : ''}</div>
         <div class="ch-title">${ch.title || '(제목 없음)'}</div>
-        ${a ? `<div class="ch-author">${a.name}</div>` : ''}
+        ${chAuthors.length ? `<div class="ch-author">${chAuthors.map(a=>a.name).join(', ')}</div>` : ''}
       </div>
       <span class="ch-status ${ch.status}"></span>
     `;
@@ -1676,7 +1740,7 @@ function renderEditorList() {
   const hasContent = true;
   saveBtn.style.display = editable ? '' : 'none';
   editMetaBtn.style.display = (editable || isAdmin) ? '' : 'none';
-  delBtn.style.display = isAdmin ? '' : 'none';
+  delBtn.style.display = (isAdmin || canEdit(ch)) ? '' : 'none';
   statusSel.style.display = hasContent ? '' : 'none';
   if (dlChBtn) dlChBtn.style.display = hasContent ? '' : 'none';
   document.getElementById('md-editor').readOnly = !editable && !isAdmin;
@@ -1685,14 +1749,213 @@ function renderEditorList() {
   document.getElementById('md-editor').value = ch.content || '';
   statusSel.value = ch.status || 'none';
   livePreview();
+  renderFeedback(ch);
 
   const labels = { done: '완료', prog: '작업 중', none: '미작성' };
   statusBadge.innerHTML = `<span class="status-badge ${ch.status}">${labels[ch.status] || '미작성'}</span>`;
 }
 
+// ── 인라인 피드백 ──
+let pendingAnchor = '';
+
+function initInlineFeedback() {
+  const pane = document.getElementById('live-preview');
+  if (!pane) return;
+  pane.addEventListener('mouseup', () => {
+    if (!isAdmin) return;
+    setTimeout(() => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) { hideInlineFeedbackBtn(); return; }
+      pendingAnchor = sel.toString().trim().substring(0, 120);
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const btn = document.getElementById('inline-fb-btn');
+      btn.style.left = Math.max(4, rect.left + rect.width/2 - 60) + 'px';
+      btn.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+      btn.style.display = 'block';
+    }, 10);
+  });
+  document.addEventListener('mousedown', e => {
+    const btn = document.getElementById('inline-fb-btn');
+    const popup = document.getElementById('inline-fb-popup');
+    if (btn && !btn.contains(e.target)) btn.style.display = 'none';
+    if (popup && !popup.contains(e.target) && e.target !== btn) popup.style.display = 'none';
+    const det = document.getElementById('fb-detail-popup');
+    if (det && !det.contains(e.target)) det.style.display = 'none';
+  });
+}
+
+function hideInlineFeedbackBtn() {
+  const btn = document.getElementById('inline-fb-btn');
+  if (btn) btn.style.display = 'none';
+}
+
+function openInlineFeedbackInput() {
+  if (!pendingAnchor) return;
+  const btn = document.getElementById('inline-fb-btn');
+  const popup = document.getElementById('inline-fb-popup');
+  const preview = document.getElementById('inline-fb-anchor-preview');
+  preview.textContent = '"' + pendingAnchor.substring(0,80) + (pendingAnchor.length>80?'…':'"');
+  document.getElementById('inline-fb-text').value = '';
+  const btnRect = btn.getBoundingClientRect();
+  popup.style.left = Math.max(4, btnRect.left - 10) + 'px';
+  popup.style.top = (btnRect.bottom + 6) + 'px';
+  popup.style.display = 'block';
+  btn.style.display = 'none';
+  setTimeout(() => document.getElementById('inline-fb-text').focus(), 50);
+}
+
+function hideInlineFeedbackPopup() {
+  document.getElementById('inline-fb-popup').style.display = 'none';
+  pendingAnchor = '';
+}
+
+function saveInlineFeedback() {
+  const ch = state.chapters.find(c => c.id === state.currentChapterId);
+  if (!ch || !isAdmin || !pendingAnchor) return;
+  const text = document.getElementById('inline-fb-text').value.trim();
+  if (!text) return;
+  if (!ch.feedback) ch.feedback = [];
+  ch.feedback.push({ id: uid(), type:'inline', anchor: pendingAnchor, text, authorName:'관리자', date: new Date().toISOString(), resolved: false });
+  hideInlineFeedbackPopup();
+  saveChapterDoc(ch);
+  livePreview();
+  renderFeedback(ch);
+}
+
+function applyInlineFeedbackHighlights(html, feedbacks) {
+  const inlines = (feedbacks||[]).filter(f => f.type === 'inline' && f.anchor);
+  inlines.forEach(fb => {
+    const search = fb.anchor.substring(0, 50).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const cls = fb.resolved ? 'fb-anchor-resolved' : 'fb-anchor';
+    const badge = `<span class="fb-badge" onclick="showFeedbackPopup('${fb.id}',event)">💬</span>`;
+    html = html.replace(new RegExp(search), m => `<mark class="${cls}" onclick="showFeedbackPopup('${fb.id}',event)">${m}${badge}</mark>`);
+  });
+  return html;
+}
+
+function showFeedbackPopup(id, e) {
+  if (e) e.stopPropagation();
+  const ch = state.chapters.find(c => c.id === state.currentChapterId);
+  if (!ch) return;
+  const fb = (ch.feedback||[]).find(f => f.id === id);
+  if (!fb) return;
+  const canResolve = !isAdmin && canEdit(ch) && !fb.resolved;
+  const det = document.getElementById('fb-detail-popup');
+  det.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px;">💬 관리자 피드백</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">${new Date(fb.date).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+    <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:8px;">${escHtml(fb.text)}</div>
+    ${fb.resolved ? `<div class="fb-resolved-badge">✅ 수정완료 · ${new Date(fb.resolvedDate).toLocaleDateString('ko-KR')}</div>` : ''}
+    <div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end;">
+      <button onclick="document.getElementById('fb-detail-popup').style.display='none'" class="nav-btn" style="font-size:12px;">닫기</button>
+      ${canResolve ? `<button onclick="markInlineFeedbackResolved('${id}')" class="nav-btn primary" style="font-size:12px;">✅ 수정완료</button>` : ''}
+      ${isAdmin ? `<button onclick="deleteInlineFeedback('${id}')" class="nav-btn" style="font-size:12px;color:var(--danger);">🗑 삭제</button>` : ''}
+    </div>`;
+  // 팝업 위치: 클릭 위치 근처
+  const x = e ? Math.min(e.clientX, window.innerWidth-300) : window.innerWidth/2-145;
+  const y = e ? Math.min(e.clientY+10, window.innerHeight-200) : window.innerHeight/2-100;
+  det.style.left = x + 'px'; det.style.top = y + 'px';
+  det.style.display = 'block';
+}
+
+function markInlineFeedbackResolved(id) {
+  const ch = state.chapters.find(c => c.id === state.currentChapterId);
+  if (!ch) return;
+  const fb = (ch.feedback||[]).find(f => f.id === id);
+  if (!fb) return;
+  fb.resolved = true; fb.resolvedDate = new Date().toISOString();
+  document.getElementById('fb-detail-popup').style.display = 'none';
+  saveChapterDoc(ch); livePreview(); renderFeedback(ch);
+}
+
+function deleteInlineFeedback(id) {
+  const ch = state.chapters.find(c => c.id === state.currentChapterId);
+  if (!ch || !isAdmin) return;
+  if (!confirm('이 피드백을 삭제하시겠습니까?')) return;
+  ch.feedback = (ch.feedback||[]).filter(f => f.id !== id);
+  document.getElementById('fb-detail-popup').style.display = 'none';
+  saveChapterDoc(ch); livePreview(); renderFeedback(ch);
+}
+
+// ── 관리자 피드백 ──
+function renderFeedback(ch) {
+  const panel = document.getElementById('feedback-panel');
+  const list = document.getElementById('feedback-list');
+  const inputRow = document.getElementById('feedback-input-row');
+  const countBadge = document.getElementById('feedback-count');
+  if (!ch) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const feedbacks = ch.feedback || [];
+  const generalFbs = feedbacks.filter(f => f.type !== 'inline');
+  const inlineFbs = feedbacks.filter(f => f.type === 'inline');
+  countBadge.textContent = feedbacks.length || '';
+  inputRow.style.display = isAdmin ? '' : 'none';
+
+  let html = '';
+  if (!generalFbs.length && !inlineFbs.length) {
+    html = `<div style="font-size:12px;color:var(--muted);padding:4px 0;">${isAdmin ? '아직 피드백이 없습니다. 아래에서 작성하세요.' : '아직 관리자 피드백이 없습니다.'}</div>`;
+  } else {
+    // 일반 피드백
+    html += generalFbs.map((f, i) => {
+      const realIdx = feedbacks.indexOf(f);
+      return `<div class="feedback-entry">
+        <div class="feedback-entry-header">
+          <span>💬 ${escHtml(f.authorName || '관리자')} · ${f.date ? new Date(f.date).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}</span>
+          ${isAdmin ? `<button onclick="deleteFeedback(${realIdx})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;" title="삭제">✕</button>` : ''}
+        </div>
+        <div class="feedback-entry-text">${escHtml(f.text)}</div>
+      </div>`;
+    }).join('');
+    // 인라인 피드백 (글 안에 삽입된)
+    if (inlineFbs.length) {
+      html += `<div style="font-size:11px;font-weight:600;color:var(--accent);margin:10px 0 4px;">📌 본문 내 인라인 피드백 (${inlineFbs.length}건)</div>`;
+      html += inlineFbs.map(f => {
+        const canResolve = !isAdmin && canEdit(ch) && !f.resolved;
+        return `<div class="feedback-entry" style="${f.resolved ? 'border-color:#22c55e;opacity:.75' : ''}">
+          <div class="feedback-entry-header">
+            <span>${f.resolved ? '✅' : '💬'} <em style="font-size:11px;color:var(--muted)">"${escHtml(f.anchor.substring(0,40))}…"</em></span>
+            ${isAdmin ? `<button onclick="deleteInlineFeedback('${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;" title="삭제">✕</button>` : ''}
+          </div>
+          <div class="feedback-entry-text">${escHtml(f.text)}</div>
+          ${f.resolved ? `<div style="font-size:11px;color:#22c55e;margin-top:4px;">✅ 수정완료 · ${new Date(f.resolvedDate).toLocaleDateString('ko-KR')}</div>` : ''}
+          ${canResolve ? `<div style="margin-top:6px;"><button onclick="markInlineFeedbackResolved('${f.id}')" class="nav-btn primary" style="font-size:12px;">✅ 수정완료</button></div>` : ''}
+        </div>`;
+      }).join('');
+    }
+  }
+  list.innerHTML = html;
+}
+
+function submitFeedback() {
+  const ch = state.chapters.find(c => c.id === state.currentChapterId);
+  if (!ch || !isAdmin) return;
+  const text = document.getElementById('feedback-textarea').value.trim();
+  if (!text) return;
+  if (!ch.feedback) ch.feedback = [];
+  ch.feedback.push({ id: uid(), text, authorName: '관리자', date: new Date().toISOString() });
+  document.getElementById('feedback-textarea').value = '';
+  saveChapterDoc(ch);
+  renderFeedback(ch);
+}
+
+function deleteFeedback(idx) {
+  const ch = state.chapters.find(c => c.id === state.currentChapterId);
+  if (!ch || !isAdmin) return;
+  if (!confirm('이 피드백을 삭제하시겠습니까?')) return;
+  ch.feedback.splice(idx, 1);
+  saveChapterDoc(ch);
+  renderFeedback(ch);
+}
+
 function livePreview() {
   const md = document.getElementById('md-editor').value;
-  document.getElementById('live-preview').innerHTML = renderWithFootnotes(md);
+  let html = renderWithFootnotes(md);
+  const ch = state.chapters.find(c => c.id === state.currentChapterId);
+  if (ch && ch.feedback && ch.feedback.some(f => f.type === 'inline')) {
+    html = applyInlineFeedbackHighlights(html, ch.feedback);
+  }
+  document.getElementById('live-preview').innerHTML = html;
 }
 
 function saveChapter() {
@@ -1842,12 +2105,12 @@ function renderDashboard() {
       const wc = ch.content ? ch.content.split(/\s+/).filter(Boolean).length : 0;
       const maxWc = Math.max(...sortedChapters.map(c => (c.content||'').split(/\s+/).filter(Boolean).length), 1);
       const pct = Math.round(wc / maxWc * 100);
-      const a = state.authors.find(a => a.id === ch.authorId);
+      const chAuthNames = state.authors.filter(a => getAuthorIds(ch).includes(a.id)).map(a=>a.name).join(', ');
       return `
       <div class="progress-row">
         <div class="progress-label" title="${ch.title}">
           <strong>단원 ${i+1}</strong> ${ch.title}
-          ${a ? `<br><span style="font-size:11px;color:var(--muted);">${a.name}</span>` : ''}
+          ${chAuthNames ? `<br><span style="font-size:11px;color:var(--muted);">${chAuthNames}</span>` : ''}
         </div>
         <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%;background:${ch.status==='done'?'var(--success)':ch.status==='prog'?'var(--warning)':'var(--border)'}"></div></div>
         <span class="status-badge ${ch.status}" style="font-size:11px;white-space:nowrap;">${labels[ch.status]||'미작성'}</span>
@@ -1861,7 +2124,7 @@ function renderDashboard() {
   if (!state.authors.length) { aDiv.innerHTML = '<div style="color:var(--muted);font-size:13px;">집필진을 추가하세요.</div>'; }
   else {
     aDiv.innerHTML = state.authors.map(a => {
-      const myChs = state.chapters.filter(c => c.authorId === a.id);
+      const myChs = state.chapters.filter(c => getAuthorIds(c).includes(a.id));
       const doneChs = myChs.filter(c => c.status === 'done').length;
       return `
       <span class="author-chip">
@@ -1939,7 +2202,7 @@ function openModal(type) {
     document.getElementById('input-ch-level').value = isAdmin ? '1' : '2';
     // disable 대단원 option for non-admins
     document.getElementById('input-ch-level').options[0].disabled = !isAdmin;
-    populateAuthorSelect('input-ch-author', null);
+    populateAuthorChecks('ch-author-checks', []);
     populateParentSelect(isAdmin ? '1' : '2');
     document.getElementById('modal-chapter').classList.add('open');
   } else if (type === 'chapter-edit') {
@@ -1949,7 +2212,7 @@ function openModal(type) {
     document.getElementById('input-che-title').value = ch.title;
     document.getElementById('input-che-status').value = ch.status;
     document.getElementById('input-che-note').value = ch.note || '';
-    populateAuthorSelect('input-che-author', ch.authorId);
+    populateAuthorChecks('che-author-checks', getAuthorIds(ch));
     document.getElementById('modal-chapter-edit').classList.add('open');
   } else if (type === 'author') {
     state.editingAuthorId = null;
@@ -1975,8 +2238,30 @@ function closeModal(type) {
 
 function populateAuthorSelect(selectId, selectedId) {
   const sel = document.getElementById(selectId);
+  if (!sel) return;
   sel.innerHTML = '<option value="">담당자 없음</option>' +
     state.authors.map(a => `<option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>${a.name}</option>`).join('');
+}
+
+function populateAuthorChecks(containerId, selectedIds) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (!state.authors.length) {
+    container.innerHTML = '<span style="font-size:12px;color:var(--muted);">집필진 없음</span>';
+    return;
+  }
+  container.innerHTML = state.authors.map(a => `
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+      <input type="checkbox" value="${a.id}" ${selectedIds.includes(a.id) ? 'checked' : ''}>
+      <span style="width:20px;height:20px;border-radius:50%;background:${a.color};display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700;">${a.name[0]}</span>
+      ${a.name}
+    </label>`).join('');
+}
+
+function getCheckedAuthors(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return [];
+  return [...container.querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
 }
 
 function saveBookTitle() {
@@ -2015,7 +2300,8 @@ function saveChapterMeta() {
     title,
     level,
     parentId: level > 1 ? (document.getElementById('input-ch-parent').value || null) : null,
-    authorId: document.getElementById('input-ch-author').value || null,
+    authorIds: getCheckedAuthors('ch-author-checks'),
+    authorId: getCheckedAuthors('ch-author-checks')[0] || null,
     status: document.getElementById('input-ch-status').value,
     note: document.getElementById('input-ch-note').value.trim(),
     content: '',
@@ -2036,7 +2322,10 @@ function saveChapterEditMeta() {
   const title = document.getElementById('input-che-title').value.trim();
   if (!title) { alert('단원 제목을 입력하세요.'); return; }
   ch.title = title;
-  ch.authorId = document.getElementById('input-che-author').value || null;
+  if (isAdmin) {
+    ch.authorIds = getCheckedAuthors('che-author-checks');
+    ch.authorId = ch.authorIds[0] || null;
+  }
   ch.status = document.getElementById('input-che-status').value;
   ch.note = document.getElementById('input-che-note').value.trim();
   save();
@@ -2093,7 +2382,10 @@ function deleteAuthor(id) {
   const a = state.authors.find(a => a.id === id);
   if (!confirm(`${a?.name}을(를) 삭제하시겠습니까?`)) return;
   state.authors = state.authors.filter(a => a.id !== id);
-  state.chapters.forEach(c => { if (c.authorId === id) c.authorId = null; });
+  state.chapters.forEach(c => {
+    if (c.authorId === id) c.authorId = null;
+    if (Array.isArray(c.authorIds)) c.authorIds = c.authorIds.filter(x => x !== id);
+  });
   save();
   renderAuthors();
   renderSidebar();
@@ -2946,7 +3238,9 @@ function renderPreview() {
 
   // 재귀 렌더
   function renderChapterPage(ch, depth) {
-    const a = state.authors.find(a => a.id === ch.authorId);
+    const chAs = state.authors.filter(a => getAuthorIds(ch).includes(a.id));
+    const a = chAs[0];
+    const aName = chAs.map(a=>a.name).join(', ');
     const levelNames = ['','대단원','중단원','소단원','소소단원'];
     const lv = ch.level || 1;
     const isEmpty = !ch.content || !ch.content.trim();
@@ -2956,7 +3250,7 @@ function renderPreview() {
       html += `<div class="b5-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#f5f7ff;">
         <div style="font-size:10pt;color:var(--accent);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12pt;">${levelNames[lv]}</div>
         <div style="font-size:20pt;font-weight:800;line-height:1.3;">${escHtml(ch.title)}</div>
-        ${a?`<div style="font-size:9pt;color:#777;margin-top:12pt;">${escHtml(a.name)}</div>`:''}
+        ${aName?`<div style="font-size:9pt;color:#777;margin-top:12pt;">${escHtml(aName)}</div>`:''}
       </div>`;
     } else {
       // 내용 있는 대단원 or 중단원 이하 = 본문 페이지
@@ -2974,7 +3268,7 @@ function renderPreview() {
       html += `<div class="b5-page">
         <div class="b5-chapter-num" style="${indent}">${levelNames[lv]}</div>
         <div class="b5-chapter-title" style="${lv>2?`font-size:${14-(lv-2)*1.5}pt;border-bottom-width:${lv>3?'0.5pt':'1pt'};`:''}${indent}">${escHtml(ch.title)}</div>
-        ${a?`<div class="b5-chapter-author">${escHtml(a.name)}${a.role?' · '+escHtml(a.role):''}</div>`:''}
+        ${aName?`<div class="b5-chapter-author">${escHtml(aName)}</div>`:''}
         <div class="b5-body">${bodyHtml}</div>
       </div>`;
     }
@@ -2982,16 +3276,7 @@ function renderPreview() {
     getChildren(ch.id).forEach(child => renderChapterPage(child, depth+1));
   }
 
-  // 디버그: 챕터 목록과 내용 유무 확인
   const roots = getChildren(null);
-  let debugInfo = `<div style="background:#fff3cd;border:1px solid #ffc107;padding:12px;margin-bottom:12px;font-size:12px;border-radius:6px;">
-    <strong>🔍 디버그 (수정 후 삭제 예정)</strong><br>
-    전체 챕터 수: ${state.chapters.length}<br>
-    루트 챕터 수: ${roots.length}<br>
-    ${roots.map(ch => `[lv${ch.level}] ${ch.title.substring(0,20)} — 내용: ${ch.content ? ch.content.length+'자' : '없음'}`).join('<br>')}
-  </div>`;
-  html = debugInfo + html;
-
   roots.forEach(ch => renderChapterPage(ch, 0));
 
   container.innerHTML = html;
