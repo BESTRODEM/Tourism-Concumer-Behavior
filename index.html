@@ -637,7 +637,6 @@
           <input type="password" id="login-pin-input" placeholder="PIN" onkeydown="if(event.key==='Enter')confirmAuthorLogin()" style="flex:1;padding-right:36px;">
           <button type="button" onclick="togglePinVisibility('login-pin-input',this)" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:0;line-height:1;" title="보기/숨기기">👁</button>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;">※ 영문 대소문자 구분</div>
         <div class="login-pin-error" id="login-pin-error">PIN이 틀렸습니다.</div>
         <button class="login-confirm-btn" onclick="confirmAuthorLogin()">로그인</button>
       </div>
@@ -3130,7 +3129,7 @@ function selectLoginAuthor(id) {
   if (a.pin) {
     // PIN 있으면 입력 요청
     const pinBox = document.getElementById('login-pin-box');
-    document.getElementById('login-pin-label').textContent = `${a.name}의 PIN을 입력하세요`;
+    document.getElementById('login-pin-label').textContent = `${a.name}의 PIN을 입력하세요 (영문 대소문자 구분)`;
     document.getElementById('login-pin-input').value = '';
     document.getElementById('login-pin-error').style.display = 'none';
     pinBox.style.display = 'block';
