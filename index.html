@@ -7,6 +7,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/toastui-editor.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/toastui-editor-all.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
@@ -318,6 +320,16 @@
     font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.7;
     background: #fafbfc; color: var(--text);
   }
+  /* ── TOAST UI EDITOR ── */
+  #md-editor { flex:1; overflow:hidden; min-height:0; }
+  .toastui-editor-defaultUI { height:100% !important; border:none !important; border-radius:0 !important; display:flex; flex-direction:column; }
+  .toastui-editor-toolbar { background:var(--bg) !important; border-bottom:1px solid var(--border) !important; flex-shrink:0 !important; }
+  .toastui-editor-main { flex:1 !important; overflow:hidden !important; }
+  .toastui-editor-ww-container, .toastui-editor-ww-wrapper { height:100% !important; }
+  .toastui-editor-md-container { height:100% !important; }
+  .toastui-editor-md-preview { background:var(--surface) !important; }
+  .ProseMirror { padding:20px !important; font-family:'Segoe UI',-apple-system,sans-serif !important; font-size:14px !important; line-height:1.85 !important; min-height:300px !important; color:var(--text) !important; }
+  .toastui-editor-mode-switch { border-top: 1px solid var(--border) !important; background:var(--bg) !important; }
   .editor-divider { width: 1px; background: var(--border); flex-shrink: 0; }
   .preview-pane { flex: 1; overflow-y: auto; padding: 24px; font-size: 15px; line-height: 1.8; }
   .preview-pane h1 { font-size: 24px; margin-bottom: 16px; }
@@ -844,9 +856,8 @@
         </div>
         <div id="editor-content" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
           <div class="editor-split">
-            <div class="editor-pane" style="flex:1;display:flex;flex-direction:column;">
-              <div class="editor-pane-label">마크다운 편집</div>
-              <textarea id="md-editor" placeholder="마크다운으로 내용을 입력하세요...&#10;&#10;# 제목&#10;## 소제목&#10;&#10;본문 내용..." oninput="editorDirty=true;livePreview()"></textarea>
+            <div class="editor-pane" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+              <div id="md-editor"></div>
             </div>
             <div class="editor-divider"></div>
             <div class="editor-pane" style="flex:1;">
@@ -1371,6 +1382,35 @@ let isAdmin = false;
 let currentUserId = null; // 현재 로그인한 집필자 ID (null = 미선택)
 let editorDirty = false;  // 미저장 변경 여부
 let pendingNavAction = null; // 미저장 팝업 확인 후 실행할 동작
+let toastEditor = null;   // Toast UI WYSIWYG 에디터 인스턴스
+
+function getMdValue() {
+  return toastEditor ? toastEditor.getMarkdown() : '';
+}
+function setMdValue(content) {
+  if (toastEditor) toastEditor.setMarkdown(content || '', false);
+}
+function initToastEditor() {
+  if (toastEditor) return;
+  toastEditor = new toastui.Editor({
+    el: document.getElementById('md-editor'),
+    height: '100%',
+    initialEditType: 'wysiwyg',
+    previewStyle: 'tab',
+    hideModeSwitch: false,
+    toolbarItems: [
+      ['heading', 'bold', 'italic', 'strike'],
+      ['hr', 'quote'],
+      ['ul', 'ol', 'task'],
+      ['table'],
+      ['link'],
+      ['code', 'codeblock']
+    ],
+    events: {
+      change: () => { editorDirty = true; livePreview(); }
+    }
+  });
+}
 
 // ── CHAPTER MIGRATION ── (기존 챕터에 level/parentId 자동 부여)
 // 챕터 담당자 ID 배열 반환 (구형 authorId 필드도 지원)
@@ -2015,7 +2055,9 @@ function renderEditorList() {
     const dlBtn = document.getElementById('download-chapter-btn');
     if (dlBtn) dlBtn.style.display = 'none';
     document.getElementById('editor-chapter-title').textContent = `📚 ${label} (관리자 전용)`;
-    document.getElementById('md-editor').value = special.content || '';
+    initToastEditor();
+    setMdValue(special.content || '');
+    editorDirty = false;
     livePreview();
     return;
   }
@@ -2088,10 +2130,9 @@ function renderEditorList() {
   delBtn.style.display = (isAdmin || canEdit(ch)) ? '' : 'none';
   statusSel.style.display = hasContent ? '' : 'none';
   if (dlChBtn) dlChBtn.style.display = hasContent ? '' : 'none';
-  document.getElementById('md-editor').readOnly = !editable && !isAdmin;
-
+  initToastEditor();
   document.getElementById('editor-chapter-title').textContent = ch.title || '(제목 없음)';
-  document.getElementById('md-editor').value = ch.content || '';
+  setMdValue(ch.content || '');
   editorDirty = false;
   statusSel.value = ch.status || 'none';
   livePreview();
@@ -2295,7 +2336,7 @@ function deleteFeedback(idx) {
 }
 
 function livePreview() {
-  const md = document.getElementById('md-editor').value;
+  const md = getMdValue();
   let html = renderWithFootnotes(md);
   const ch = state.chapters.find(c => c.id === state.currentChapterId);
   if (ch && ch.feedback && ch.feedback.some(f => f.type === 'inline')) {
@@ -2308,7 +2349,7 @@ function saveChapter() {
   // 프롤로그 / 에필로그 저장
   if (state.currentChapterId === '__prologue__' || state.currentChapterId === '__epilogue__') {
     const type = state.currentChapterId === '__prologue__' ? 'prologue' : 'epilogue';
-    state[type].content   = document.getElementById('md-editor').value;
+    state[type].content   = getMdValue();
     state[type].updatedAt = new Date().toISOString();
     editorDirty = false;
     save();
@@ -2320,7 +2361,7 @@ function saveChapter() {
   }
   const ch = state.chapters.find(c => c.id === state.currentChapterId);
   if (!ch) return;
-  ch.content = document.getElementById('md-editor').value;
+  ch.content = getMdValue();
   ch.updatedAt = new Date().toISOString();
   editorDirty = false;
   save();
@@ -2373,11 +2414,12 @@ function handleFileUpload(e) {
         const html = result.value;
         // HTML → 간단 마크다운 변환
         const md = htmlToMd(html);
-        const ta = document.getElementById('md-editor');
-        if (ta.value.trim()) {
+        const current = getMdValue();
+        if (current.trim()) {
           if (!confirm('현재 내용을 업로드한 Word 파일로 교체할까요?')) return;
         }
-        ta.value = md;
+        setMdValue(md);
+        editorDirty = true;
         livePreview();
         if (result.messages.length) console.warn('mammoth 경고:', result.messages);
       } catch(err) {
@@ -2391,7 +2433,8 @@ function handleFileUpload(e) {
   // .txt / .md 파일
   const reader = new FileReader();
   reader.onload = (ev) => {
-    document.getElementById('md-editor').value = ev.target.result;
+    setMdValue(ev.target.result);
+    editorDirty = true;
     livePreview();
   };
   reader.readAsText(file, 'UTF-8');
@@ -3335,8 +3378,7 @@ function getMediaMd(id) {
 function insertMediaToEditor(id) {
   const md = getMediaMd(id);
   if (!md) return;
-  insertAtCursor(document.getElementById('md-editor'), md);
-  livePreview();
+  if (toastEditor) { toastEditor.insertText('\n' + md + '\n'); editorDirty = true; livePreview(); }
   if (currentPage === 'media') showPage('editor');
 }
 function copyMediaMd(id) {
@@ -3419,9 +3461,11 @@ function updateTablePreview() {
 }
 
 function insertTableToEditor() {
-  const ta = document.getElementById('md-editor');
-  insertAtCursor(ta, getTableMd());
-  livePreview();
+  if (toastEditor) {
+    toastEditor.insertText('\n' + getTableMd() + '\n');
+    editorDirty = true;
+    livePreview();
+  }
   closeModal('table-editor');
 }
 
