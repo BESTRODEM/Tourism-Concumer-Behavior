@@ -3721,7 +3721,6 @@ function completeLogin(authorId) {
   isAdmin = !!(loginAuthor && loginAuthor.coAdmin);
   sessionStorage.setItem('login-user', authorId);
   sessionStorage.setItem('login-admin', isAdmin ? '1' : '0');
-  sessionStorage.setItem('login-admin', '0');
   document.getElementById('login-screen').style.display = 'none';
   // sync dropdown
   const sel = document.getElementById('current-user-sel');
