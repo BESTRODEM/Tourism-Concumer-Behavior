@@ -886,7 +886,7 @@
       <div style="display:flex;align-items:center;gap:10px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;">
         <span style="font-size:13px;color:var(--muted);">📖 B5 판형 전체 미리보기</span>
         <div style="flex:1;"></div>
-        <button class="editor-tool-btn" onclick="downloadMyChapterDocx()" title="내가 작성한 단원만 Word로 다운로드">📥 내 단원 Word</button>
+        <button class="editor-tool-btn" onclick="downloadMyChapterDocx()" title="현재 단원을 Word로 다운로드">📥 Word 다운로드</button>
         <button class="nav-btn primary" onclick="downloadFullBookDocx()" title="전체 책을 Word로 다운로드">📥 전체 Word 다운로드</button>
         <button class="editor-tool-btn" onclick="window.print()" title="인쇄 / PDF 저장">🖨 인쇄</button>
       </div>
@@ -1388,13 +1388,24 @@ function getMdValue() {
   return toastEditor ? toastEditor.getMarkdown() : '';
 }
 function setMdValue(content) {
-  if (toastEditor) toastEditor.setMarkdown(content || '', false);
+  if (!toastEditor) return;
+  // changeMode 타임아웃이 아직 실행 중일 수 있으므로 같은 타이밍에 content도 설정
+  const md = content || '';
+  toastEditor.setMarkdown(md, false);
+  // WYSIWYG 모드 전환 후에도 content가 정확히 반영되도록 보장
+  setTimeout(() => {
+    if (toastEditor && toastEditor.getMarkdown() !== md) toastEditor.setMarkdown(md, false);
+  }, 80);
 }
 function initToastEditor() {
   if (toastEditor) return;
+  // 컨테이너 높이 계산 (레이아웃이 준비된 후)
+  const el = document.getElementById('md-editor');
+  const parentH = el.parentElement ? el.parentElement.getBoundingClientRect().height : 0;
+  const editorH = parentH > 150 ? parentH + 'px' : 'calc(100vh - 220px)';
   toastEditor = new toastui.Editor({
-    el: document.getElementById('md-editor'),
-    height: '100%',
+    el: el,
+    height: editorH,
     initialEditType: 'wysiwyg',
     previewStyle: 'tab',
     hideModeSwitch: false,
@@ -1410,6 +1421,8 @@ function initToastEditor() {
       change: () => { editorDirty = true; livePreview(); }
     }
   });
+  // WYSIWYG 모드 강제 (localStorage에 저장된 이전 모드 덮어쓰기)
+  setTimeout(() => { if (toastEditor) toastEditor.changeMode('wysiwyg'); }, 50);
 }
 
 // ── CHAPTER MIGRATION ── (기존 챕터에 level/parentId 자동 부여)
@@ -1579,6 +1592,7 @@ async function saveChapterDoc(ch) {
       status: ch.status || 'none',
       content: ch.content || '', note: ch.note || '',
       feedback: ch.feedback || [],
+      order: ch.order !== undefined ? ch.order : null,
       createdAt: ch.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -1619,7 +1633,8 @@ function setupRealtimeListeners() {
     state.chapters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     renderSidebar();
     if (currentPage === 'dashboard') renderDashboard();
-    if (currentPage === 'editor' && state.currentChapterId) renderEditorList();
+    // 편집 중(dirty)이 아닐 때만 에디터 갱신 (저장 전 내용 보호)
+    if (currentPage === 'editor' && state.currentChapterId && !editorDirty) renderEditorList();
     if (currentPage === 'preview') renderPreview();
     if (currentPage === 'authors') renderAuthors();
   });
@@ -2361,7 +2376,12 @@ function saveChapter() {
   }
   const ch = state.chapters.find(c => c.id === state.currentChapterId);
   if (!ch) return;
-  ch.content = getMdValue();
+  const newContent = getMdValue();
+  // 안전 장치: 기존 내용이 있는데 에디터가 비어있으면 저장 차단
+  if (!newContent.trim() && ch.content && ch.content.trim()) {
+    if (!confirm('에디터 내용이 비어있습니다. 기존 내용이 삭제됩니다. 계속하시겠습니까?')) return;
+  }
+  ch.content = newContent;
   ch.updatedAt = new Date().toISOString();
   editorDirty = false;
   save();
