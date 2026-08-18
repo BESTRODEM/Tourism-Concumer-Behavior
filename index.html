@@ -1382,47 +1382,76 @@ let isAdmin = false;
 let currentUserId = null; // 현재 로그인한 집필자 ID (null = 미선택)
 let editorDirty = false;  // 미저장 변경 여부
 let pendingNavAction = null; // 미저장 팝업 확인 후 실행할 동작
-let toastEditor = null;   // Toast UI WYSIWYG 에디터 인스턴스
+let toastEditor = null;       // Toast UI WYSIWYG 에디터 인스턴스
+let editorFallback = false;   // Toast UI 로딩 실패 시 textarea 사용
 
 function getMdValue() {
+  if (editorFallback) {
+    const ta = document.getElementById('md-editor-ta');
+    return ta ? ta.value : '';
+  }
   return toastEditor ? toastEditor.getMarkdown() : '';
 }
 function setMdValue(content) {
-  if (!toastEditor) return;
-  // changeMode 타임아웃이 아직 실행 중일 수 있으므로 같은 타이밍에 content도 설정
   const md = content || '';
+  if (editorFallback) {
+    const ta = document.getElementById('md-editor-ta');
+    if (ta) ta.value = md;
+    return;
+  }
+  if (!toastEditor) return;
   toastEditor.setMarkdown(md, false);
-  // WYSIWYG 모드 전환 후에도 content가 정확히 반영되도록 보장
+  // changeMode(wysiwyg) 50ms 타임아웃 이후에도 내용 보장
   setTimeout(() => {
-    if (toastEditor && toastEditor.getMarkdown() !== md) toastEditor.setMarkdown(md, false);
+    if (toastEditor) toastEditor.setMarkdown(md, false);
   }, 80);
 }
+function insertIntoEditor(text) {
+  if (editorFallback) {
+    const ta = document.getElementById('md-editor-ta');
+    if (ta) { insertAtCursor(ta, text); editorDirty = true; livePreview(); }
+  } else if (toastEditor) {
+    toastEditor.insertText('\n' + text + '\n');
+    editorDirty = true; livePreview();
+  }
+}
 function initToastEditor() {
-  if (toastEditor) return;
-  // 컨테이너 높이 계산 (레이아웃이 준비된 후)
+  if (toastEditor || editorFallback) return;
   const el = document.getElementById('md-editor');
-  const parentH = el.parentElement ? el.parentElement.getBoundingClientRect().height : 0;
-  const editorH = parentH > 150 ? parentH + 'px' : 'calc(100vh - 220px)';
-  toastEditor = new toastui.Editor({
-    el: el,
-    height: editorH,
-    initialEditType: 'wysiwyg',
-    previewStyle: 'tab',
-    hideModeSwitch: false,
-    toolbarItems: [
-      ['heading', 'bold', 'italic', 'strike'],
-      ['hr', 'quote'],
-      ['ul', 'ol', 'task'],
-      ['table'],
-      ['link'],
-      ['code', 'codeblock']
-    ],
-    events: {
-      change: () => { editorDirty = true; livePreview(); }
-    }
-  });
-  // WYSIWYG 모드 강제 (localStorage에 저장된 이전 모드 덮어쓰기)
-  setTimeout(() => { if (toastEditor) toastEditor.changeMode('wysiwyg'); }, 50);
+  try {
+    if (typeof toastui === 'undefined') throw new Error('toastui not loaded');
+    const parentH = el.parentElement ? el.parentElement.getBoundingClientRect().height : 0;
+    const editorH = parentH > 150 ? parentH + 'px' : 'calc(100vh - 220px)';
+    toastEditor = new toastui.Editor({
+      el: el,
+      height: editorH,
+      initialEditType: 'wysiwyg',
+      previewStyle: 'tab',
+      hideModeSwitch: false,
+      toolbarItems: [
+        ['heading', 'bold', 'italic', 'strike'],
+        ['hr', 'quote'],
+        ['ul', 'ol', 'task'],
+        ['table'],
+        ['link'],
+        ['code', 'codeblock']
+      ],
+      events: {
+        change: () => { editorDirty = true; livePreview(); }
+      }
+    });
+    // WYSIWYG 모드 강제
+    setTimeout(() => { if (toastEditor) toastEditor.changeMode('wysiwyg'); }, 50);
+  } catch(e) {
+    console.warn('Toast UI 초기화 실패, textarea 대체 사용:', e);
+    editorFallback = true;
+    el.innerHTML = `<textarea id="md-editor-ta"
+      style="flex:1;width:100%;height:100%;resize:none;border:none;outline:none;
+             padding:20px;font-family:'Segoe UI',-apple-system,sans-serif;
+             font-size:14px;line-height:1.85;background:#fafbfc;color:var(--text);"
+      oninput="editorDirty=true;livePreview()"
+      placeholder="내용을 입력하세요..."></textarea>`;
+  }
 }
 
 // ── CHAPTER MIGRATION ── (기존 챕터에 level/parentId 자동 부여)
@@ -3398,7 +3427,7 @@ function getMediaMd(id) {
 function insertMediaToEditor(id) {
   const md = getMediaMd(id);
   if (!md) return;
-  if (toastEditor) { toastEditor.insertText('\n' + md + '\n'); editorDirty = true; livePreview(); }
+  insertIntoEditor(md);
   if (currentPage === 'media') showPage('editor');
 }
 function copyMediaMd(id) {
@@ -3481,11 +3510,7 @@ function updateTablePreview() {
 }
 
 function insertTableToEditor() {
-  if (toastEditor) {
-    toastEditor.insertText('\n' + getTableMd() + '\n');
-    editorDirty = true;
-    livePreview();
-  }
+  insertIntoEditor(getTableMd());
   closeModal('table-editor');
 }
 
