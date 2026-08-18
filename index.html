@@ -845,7 +845,7 @@
           <input type="file" id="file-upload" accept=".txt,.md,.docx" onchange="handleFileUpload(event)">
         </div>
         <button class="nav-btn primary" onclick="saveChapter()" id="save-btn" style="display:none">저장</button>
-        <button class="editor-tool-btn" id="download-chapter-btn" onclick="downloadMyChapterDocx()" title="내 단원 전체를 Word 파일로 다운로드" style="display:none">📥 내 단원 Word</button>
+        <button class="editor-tool-btn" id="download-chapter-btn" onclick="downloadMyChapterDocx()" title="현재 단원을 Word 파일로 다운로드 (저장 전 내용도 반영)" style="display:none">📥 Word 다운로드</button>
         <button class="icon-btn" onclick="openModal('chapter-edit')" id="edit-meta-btn" style="display:none" title="단원 정보 수정">✏️</button>
         <button class="icon-btn" onclick="deleteCurrentChapter()" id="del-btn" style="display:none" title="단원 삭제" style="color:var(--danger)">🗑</button>
       </div>
@@ -3978,33 +3978,52 @@ function triggerBlobDownload(blob, filename) {
 }
 
 // 내 단원 Word 다운로드
+// 현재 단원 Word 다운로드 (에디터의 실시간 내용 기준 — 저장 전이어도 반영)
 async function downloadMyChapterDocx() {
   if (!window.JSZip) { alert('Word 라이브러리(JSZip) 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+  const rootChapter = state.chapters.find(c => c.id === state.currentChapterId);
+  if (!rootChapter) { alert('먼저 왼쪽에서 단원을 선택해주세요.'); return; }
+
+  // 에디터의 현재 내용(저장 전 포함)을 가져옴
+  const liveContent = getMdValue();
+
+  // 현재 챕터 + 하위 챕터 수집
+  const chapters = [];
+  function collect(parentId) {
+    state.chapters
+      .filter(c => (c.parentId || null) === (parentId || null))
+      .sort((a, b) => {
+        const ao = a.order !== undefined ? a.order : Infinity;
+        const bo = b.order !== undefined ? b.order : Infinity;
+        return ao !== bo ? ao - bo : new Date(a.createdAt) - new Date(b.createdAt);
+      })
+      .forEach(ch => { chapters.push(ch); collect(ch.id); });
+  }
+  chapters.push(rootChapter);
+  collect(rootChapter.id);
+
   const author = state.authors.find(a => a.id === currentUserId);
   const authorName = author ? author.name : (isAdmin ? '관리자' : '집필자');
-  // 현재 선택된 챕터와 그 하위 챕터만 수집
-  const rootChapter = state.chapters.find(c => c.id === state.currentChapterId);
-  if (!rootChapter) { alert('먼저 단원을 선택해주세요.'); return; }
-  const myChapters = [];
-  function collect(parentId) {
-    state.chapters.filter(c => (c.parentId||null) === (parentId||null))
-      .sort((a,b) => new Date(a.createdAt)-new Date(b.createdAt))
-      .forEach(ch => { myChapters.push(ch); collect(ch.id); });
-  }
-  myChapters.push(rootChapter);
-  collect(rootChapter.id);
-  if (!myChapters.length) { alert('작성된 단원이 없습니다.'); return; }
+
+  // 제목 페이지
   let body = `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="48"/></w:rPr><w:t>${escXml(state.book.title)}</w:t></w:r></w:p>`;
   if (state.book.sub) body += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="24"/><w:color w:val="555555"/></w:rPr><w:t>${escXml(state.book.sub)}</w:t></w:r></w:p>`;
-  body += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:color w:val="888888"/></w:rPr><w:t>집필: ${escXml(authorName)}</w:t></w:r></w:p><w:p/><w:p/>`;
-  for (const ch of myChapters) {
+  body += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:color w:val="888888"/></w:rPr><w:t>집필: ${escXml(authorName)}</w:t></w:r></w:p>`;
+  const now = new Date().toLocaleDateString('ko-KR');
+  body += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/><w:color w:val="aaaaaa"/></w:rPr><w:t>다운로드: ${now}</w:t></w:r></w:p><w:p/><w:p/>`;
+
+  // 챕터 내용 — 현재 편집 중인 챕터는 에디터 실시간 내용 사용
+  for (const ch of chapters) {
     const styleId = 'Heading' + Math.min(ch.level || 1, 4);
     body += `<w:p><w:pPr><w:pStyle w:val="${styleId}"/></w:pPr><w:r><w:t>${escXml(ch.title)}</w:t></w:r></w:p>`;
-    if (ch.content) body += mdToOoxmlBody(ch.content);
+    const content = (ch.id === state.currentChapterId) ? liveContent : (ch.content || '');
+    if (content) body += mdToOoxmlBody(content);
     body += '<w:p/>';
   }
+
+  const safeTitle = rootChapter.title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
   const blob = await buildDocxBlob(body);
-  if (blob) triggerBlobDownload(blob, `${authorName}_${state.book.title}.docx`);
+  if (blob) triggerBlobDownload(blob, `${safeTitle}.docx`);
 }
 
 // 전체 책 Word 다운로드
