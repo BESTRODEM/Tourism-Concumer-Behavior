@@ -726,6 +726,7 @@
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('dashboard')">대시보드</button>
     <button class="nav-tab" onclick="showPage('editor')">편집</button>
+    <button class="nav-tab" onclick="showPage('media')">🖼 그림</button>
     <button class="nav-tab" onclick="showPage('preview')">전체 미리보기</button>
     <button class="nav-tab" onclick="showPage('authors')">집필진</button>
   </div>
@@ -1771,7 +1772,7 @@ function showPage(p) {
     el.style.display = id === p ? (id === 'editor' ? 'flex' : 'block') : 'none';
   });
   // main tabs (exclude intranet which is a separate button)
-  const mainTabs = ['dashboard','editor','preview','authors','media'];
+  const mainTabs = ['dashboard','editor','media','preview','authors'];
   document.querySelectorAll('.nav-tabs .nav-tab').forEach((t,i) => {
     t.classList.toggle('active', mainTabs[i] === p);
   });
