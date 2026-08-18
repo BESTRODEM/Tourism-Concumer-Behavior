@@ -1472,15 +1472,14 @@ function migrateChapters() {
       changed = true; toSave.push(ch);
     }
   });
-  // order 필드 초기화 — 없는 챕터에 createdAt 기반으로 부여
-  const needsOrder = state.chapters.filter(ch => ch.order === undefined);
+  // order 필드 초기화 — null/undefined 모두 처리
+  const needsOrder = state.chapters.filter(ch => ch.order == null); // == 로 null·undefined 모두 포착
   if (needsOrder.length) {
-    // 같은 parentId끼리 createdAt 순으로 order 부여
     const parents = [...new Set(state.chapters.map(c => c.parentId || null))];
     parents.forEach(pid => {
       const siblings = state.chapters.filter(c => (c.parentId || null) === pid)
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      siblings.forEach((c, i) => { if (c.order === undefined) { c.order = i; toSave.push(c); changed = true; } });
+      siblings.forEach((c, i) => { if (c.order == null) { c.order = i; toSave.push(c); changed = true; } });
     });
   }
   if (changed) {
@@ -1885,17 +1884,27 @@ function renderSidebar() {
     return state.chapters
       .filter(c => (c.parentId || null) === (parentId || null))
       .sort((a, b) => {
-        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+        const ao = (a.order != null) ? a.order : Infinity;
+        const bo = (b.order != null) ? b.order : Infinity;
+        if (ao !== bo) return ao - bo;
         return new Date(a.createdAt) - new Date(b.createdAt);
       });
   }
 
-  // 드롭 후 순서 저장
-  function saveOrder(siblings) {
-    siblings.forEach((c, i) => {
-      c.order = i;
-      saveChapterDoc(c);
-    });
+  // 드롭 후 순서 저장 — Firestore 배치로 원자적 저장
+  async function saveOrder(siblings) {
+    siblings.forEach((c, i) => { c.order = i; }); // 메모리 즉시 반영
+    if (legacyMode || !db) return;
+    try {
+      const batch = db.batch();
+      siblings.forEach((c, i) => {
+        batch.update(db.collection(COLL_CHAPTERS).doc(c.id), { order: i });
+      });
+      await batch.commit();
+      fbStatus('✓ 순서 저장됨', '#22c55e', 1500);
+    } catch(e) {
+      fbStatus('⚠️ 순서 저장 실패: ' + e.message, '#ef4444', 3000);
+    }
   }
 
   function renderNode(ch, idx) {
@@ -3745,7 +3754,9 @@ function renderPreview() {
     return state.chapters
       .filter(c => (c.parentId || null) === (parentId || null))
       .sort((a, b) => {
-        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+        const ao = (a.order != null) ? a.order : Infinity;
+        const bo = (b.order != null) ? b.order : Infinity;
+        if (ao !== bo) return ao - bo;
         return new Date(a.createdAt) - new Date(b.createdAt);
       });
   }
