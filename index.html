@@ -96,6 +96,10 @@
   .chapter-item.dragging  { opacity: .35 !important; }
   .drag-handle { cursor: grab; color: var(--border); font-size: 13px; flex-shrink: 0; padding: 0 2px; transition: color .15s; }
   .chapter-item:hover .drag-handle { color: var(--muted); }
+  .ch-actions { display:none; gap:2px; flex-shrink:0; }
+  .chapter-item:hover .ch-actions { display:flex; }
+  .ch-action-btn { width:22px;height:22px;border:none;background:none;cursor:pointer;border-radius:4px;font-size:13px;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:all .15s; }
+  .ch-action-btn:hover { background:var(--bg); color:var(--text); }
 
   /* ── FIREBASE SETUP ── */
   #fb-setup-screen {
@@ -1829,6 +1833,11 @@ function renderSidebar() {
 
     const handleHtml = isAdmin
       ? `<span class="drag-handle" title="드래그하여 순서 변경">⠿</span>` : '';
+    const actionsHtml = isAdmin ? `
+      <div class="ch-actions">
+        <button class="ch-action-btn" title="단원 정보 수정" data-action="edit">✏️</button>
+        <button class="ch-action-btn" title="단원 삭제" data-action="del">🗑</button>
+      </div>` : '';
 
     div.innerHTML = `
       ${handleHtml}
@@ -1839,11 +1848,29 @@ function renderSidebar() {
         ${chAuthors.length ? `<div class="ch-author">${chAuthors.map(a=>a.name).join(', ')}</div>` : ''}
       </div>
       <span class="ch-status ${ch.status}"></span>
+      ${actionsHtml}
     `;
     if (accessible) {
       div.onclick = (e) => {
         if (e.target.classList.contains('drag-handle')) return;
+        if (e.target.dataset.action) return;
         selectChapter(ch.id);
+      };
+    }
+
+    // 사이드바 ✏️ 🗑 버튼 (관리자)
+    if (isAdmin) {
+      const editBtn = div.querySelector('[data-action="edit"]');
+      const delBtn  = div.querySelector('[data-action="del"]');
+      if (editBtn) editBtn.onclick = (e) => {
+        e.stopPropagation();
+        state.currentChapterId = ch.id;
+        openModal('chapter-edit');
+      };
+      if (delBtn) delBtn.onclick = (e) => {
+        e.stopPropagation();
+        state.currentChapterId = ch.id;
+        deleteCurrentChapter();
       };
     }
 
@@ -2433,7 +2460,10 @@ function renderDashboard() {
   if (!total) { chDiv.innerHTML = '<div style="color:var(--muted);font-size:13px;">아직 단원이 없습니다. 단원을 추가하세요.</div>'; }
   else {
     const labels = { done: '완료', prog: '작업 중', none: '미작성' };
-    const sortedChapters = [...state.chapters].sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const sortedChapters = [...state.chapters].sort((a,b) => {
+      if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    });
     chDiv.innerHTML = sortedChapters.map((ch,i) => {
       const wc = ch.content ? ch.content.split(/\s+/).filter(Boolean).length : 0;
       const maxWc = Math.max(...sortedChapters.map(c => (c.content||'').split(/\s+/).filter(Boolean).length), 1);
