@@ -94,6 +94,14 @@
   .ch-author { font-size: 11px; color: var(--muted); }
   .ch-drag { cursor: grab; color: var(--border); font-size: 14px; flex-shrink: 0; }
   .chapter-item.locked:hover { background: transparent; }
+  .chapter-item.drag-over { background: #dde8ff !important; border-left-color: var(--accent) !important; outline: 1.5px dashed var(--accent); }
+  .chapter-item.dragging  { opacity: .35 !important; }
+  .drag-handle { cursor: grab; color: var(--border); font-size: 13px; flex-shrink: 0; padding: 0 2px; transition: color .15s; }
+  .chapter-item:hover .drag-handle { color: var(--muted); }
+  .ch-actions { display:none; gap:2px; flex-shrink:0; }
+  .chapter-item:hover .ch-actions { display:flex; }
+  .ch-action-btn { width:22px;height:22px;border:none;background:none;cursor:pointer;border-radius:4px;font-size:13px;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:all .15s; }
+  .ch-action-btn:hover { background:var(--bg); color:var(--text); }
 
   /* ── FIREBASE SETUP ── */
   #fb-setup-screen {
@@ -839,7 +847,7 @@
           <input type="file" id="file-upload" accept=".txt,.md,.docx" onchange="handleFileUpload(event)">
         </div>
         <button class="nav-btn primary" onclick="saveChapter()" id="save-btn" style="display:none">저장</button>
-        <button class="editor-tool-btn" id="download-chapter-btn" onclick="downloadMyChapterDocx()" title="내 단원 전체를 Word 파일로 다운로드" style="display:none">📥 내 단원 Word</button>
+        <button class="editor-tool-btn" id="download-chapter-btn" onclick="downloadMyChapterDocx()" title="현재 단원을 Word 파일로 다운로드 (저장 전 내용도 반영)" style="display:none">📥 Word 다운로드</button>
         <button class="icon-btn" onclick="openModal('chapter-edit')" id="edit-meta-btn" style="display:none" title="단원 정보 수정">✏️</button>
         <button class="icon-btn" onclick="deleteCurrentChapter()" id="del-btn" style="display:none" title="단원 삭제" style="color:var(--danger)">🗑</button>
       </div>
@@ -880,7 +888,7 @@
       <div style="display:flex;align-items:center;gap:10px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;">
         <span style="font-size:13px;color:var(--muted);">📖 B5 판형 전체 미리보기</span>
         <div style="flex:1;"></div>
-        <button class="editor-tool-btn" onclick="downloadMyChapterDocx()" title="내가 작성한 단원만 Word로 다운로드">📥 내 단원 Word</button>
+        <button class="editor-tool-btn" onclick="downloadMyChapterDocx()" title="현재 단원을 Word로 다운로드">📥 Word 다운로드</button>
         <button class="nav-btn primary" onclick="downloadFullBookDocx()" title="전체 책을 Word로 다운로드">📥 전체 Word 다운로드</button>
         <button class="editor-tool-btn" onclick="window.print()" title="인쇄 / PDF 저장">🖨 인쇄</button>
       </div>
@@ -905,10 +913,10 @@
     <div id="page-media">
       <div class="media-toolbar">
         <button class="nav-btn" onclick="showPage('editor')" style="font-size:12px;">← 편집으로</button>
-        <h2 style="margin-left:8px;">🖼 그림 업로드</h2>
+        <h2 style="margin-left:8px;">📤 그림 업로드</h2>
         <div class="gap-spacer"></div>
         <span id="media-filter-label" style="font-size:12px;color:var(--muted);"></span>
-        <button class="nav-btn" id="media-filter-btn" onclick="toggleMediaFilter()">👤 내 그림만</button>
+        <button class="nav-btn" id="media-filter-btn" onclick="toggleMediaFilter()" title="내 그림 / 전체 보기 전환">👤 내 그림만</button>
         <button class="nav-btn primary" onclick="document.getElementById('media-upload-input').click()">+ 업로드</button>
         <input type="file" id="media-upload-input" accept="image/*" multiple style="display:none" onchange="handleMediaUpload(event)">
       </div>
@@ -1379,9 +1387,9 @@ let isAdmin = false;
 let currentUserId = null; // 현재 로그인한 집필자 ID (null = 미선택)
 let editorDirty = false;  // 미저장 변경 여부
 let pendingNavAction = null; // 미저장 팝업 확인 후 실행할 동작
-let quillEditor = null;   // Quill WYSIWYG 에디터 인스턴스
+let quillEditor = null;       // Quill WYSIWYG 에디터 인스턴스
 
-// ── Quill HTML → 마크다운 (저장/Word 출력용) ──
+// ── Quill HTML → 마크다운 변환 (저장/Word 출력용) ──
 function domNodeToMd(node) {
   if (node.nodeType === 3) return node.textContent;
   if (node.nodeType !== 1) return '';
@@ -1421,6 +1429,7 @@ function quillHtmlToMd(html) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
   return domNodeToMd(doc.body.firstChild).replace(/\n{3,}/g, '\n\n').trim();
 }
+
 function getMdValue() {
   if (!quillEditor) return '';
   return quillHtmlToMd(quillEditor.root.innerHTML);
@@ -1439,11 +1448,14 @@ function insertIntoEditor(text) {
   quillEditor.clipboard.dangerouslyPasteHTML(idx, html);
   editorDirty = true; livePreview();
 }
-function initToastEditor() { initQuillEditor(); }
+function initToastEditor() { initQuillEditor(); } // 하위호환 별칭
 function initQuillEditor() {
   if (quillEditor) return;
   const el = document.getElementById('md-editor');
-  if (!el || typeof Quill === 'undefined') return;
+  if (!el || typeof Quill === 'undefined') {
+    console.warn('Quill 라이브러리 미로딩');
+    return;
+  }
   el.innerHTML = '';
   quillEditor = new Quill(el, {
     theme: 'snow',
@@ -1480,6 +1492,16 @@ function migrateChapters() {
       changed = true; toSave.push(ch);
     }
   });
+  // order 필드 초기화 — null/undefined 모두 처리
+  const needsOrder = state.chapters.filter(ch => ch.order == null); // == 로 null·undefined 모두 포착
+  if (needsOrder.length) {
+    const parents = [...new Set(state.chapters.map(c => c.parentId || null))];
+    parents.forEach(pid => {
+      const siblings = state.chapters.filter(c => (c.parentId || null) === pid)
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      siblings.forEach((c, i) => { if (c.order == null) { c.order = i; toSave.push(c); changed = true; } });
+    });
+  }
   if (changed) {
     save();
     toSave.forEach(ch => saveChapterDoc(ch));
@@ -1618,6 +1640,7 @@ async function saveChapterDoc(ch) {
       status: ch.status || 'none',
       content: ch.content || '', note: ch.note || '',
       feedback: ch.feedback || [],
+      order: ch.order !== undefined ? ch.order : null,
       createdAt: ch.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -1658,7 +1681,8 @@ function setupRealtimeListeners() {
     state.chapters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     renderSidebar();
     if (currentPage === 'dashboard') renderDashboard();
-    if (currentPage === 'editor' && state.currentChapterId) renderEditorList();
+    // 편집 중(dirty)이 아닐 때만 에디터 갱신 (저장 전 내용 보호)
+    if (currentPage === 'editor' && state.currentChapterId && !editorDirty) renderEditorList();
     if (currentPage === 'preview') renderPreview();
     if (currentPage === 'authors') renderAuthors();
   });
@@ -1872,10 +1896,40 @@ function renderSidebar() {
   const LEVEL_LABEL = ['','대','중','소','소소'];
   const LEVEL_COLOR = ['','#4f6ef7','#22c55e','#f59e0b','#8b5cf6'];
 
+  // 드래그 상태
+  let dragSrcId = null;
+
+  // order 기준 정렬 헬퍼
+  function sortedChildren(parentId) {
+    return state.chapters
+      .filter(c => (c.parentId || null) === (parentId || null))
+      .sort((a, b) => {
+        const ao = (a.order != null) ? a.order : Infinity;
+        const bo = (b.order != null) ? b.order : Infinity;
+        if (ao !== bo) return ao - bo;
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      });
+  }
+
+  // 드롭 후 순서 저장 — Firestore 배치로 원자적 저장
+  async function saveOrder(siblings) {
+    siblings.forEach((c, i) => { c.order = i; }); // 메모리 즉시 반영
+    if (legacyMode || !db) return;
+    try {
+      const batch = db.batch();
+      siblings.forEach((c, i) => {
+        batch.update(db.collection(COLL_CHAPTERS).doc(c.id), { order: i });
+      });
+      await batch.commit();
+      fbStatus('✓ 순서 저장됨', '#22c55e', 1500);
+    } catch(e) {
+      fbStatus('⚠️ 순서 저장 실패: ' + e.message, '#ef4444', 3000);
+    }
+  }
+
   function renderNode(ch, idx) {
     const chAuthorIds = getAuthorIds(ch);
     const chAuthors = state.authors.filter(a => chAuthorIds.includes(a.id));
-    const a = chAuthors[0];
     const accessible = canAccess(ch);
     const isActive = state.currentChapterId === ch.id;
     const level = ch.level || 1;
@@ -1887,8 +1941,19 @@ function renderSidebar() {
     div.style.paddingLeft = (16 + indent) + 'px';
     div.style.opacity = accessible ? '1' : '0.45';
     div.style.cursor = accessible ? 'pointer' : 'not-allowed';
+    div.dataset.chId = ch.id;
+    div.dataset.parentId = ch.parentId || '';
+
+    const handleHtml = isAdmin
+      ? `<span class="drag-handle" title="드래그하여 순서 변경">⠿</span>` : '';
+    const actionsHtml = isAdmin ? `
+      <div class="ch-actions">
+        <button class="ch-action-btn" title="단원 정보 수정" data-action="edit">✏️</button>
+        <button class="ch-action-btn" title="단원 삭제" data-action="del">🗑</button>
+      </div>` : '';
 
     div.innerHTML = `
+      ${handleHtml}
       <span style="width:6px;height:6px;border-radius:50%;background:${lcolor};flex-shrink:0;"></span>
       <div class="ch-info">
         <div class="ch-num" style="color:${lcolor};">${LEVEL_LABEL[level]}단원 ${idx+1}${!accessible ? ' 🔒' : ''}</div>
@@ -1896,14 +1961,78 @@ function renderSidebar() {
         ${chAuthors.length ? `<div class="ch-author">${chAuthors.map(a=>a.name).join(', ')}</div>` : ''}
       </div>
       <span class="ch-status ${ch.status}"></span>
+      ${actionsHtml}
     `;
-    if (accessible) div.onclick = () => selectChapter(ch.id);
+    if (accessible) {
+      div.onclick = (e) => {
+        if (e.target.classList.contains('drag-handle')) return;
+        if (e.target.dataset.action) return;
+        selectChapter(ch.id);
+      };
+    }
+
+    // 사이드바 ✏️ 🗑 버튼 (관리자)
+    if (isAdmin) {
+      const editBtn = div.querySelector('[data-action="edit"]');
+      const delBtn  = div.querySelector('[data-action="del"]');
+      if (editBtn) editBtn.onclick = (e) => {
+        e.stopPropagation();
+        state.currentChapterId = ch.id;
+        openModal('chapter-edit');
+      };
+      if (delBtn) delBtn.onclick = (e) => {
+        e.stopPropagation();
+        state.currentChapterId = ch.id;
+        deleteCurrentChapter();
+      };
+    }
+
+    // 드래그 (관리자 전용)
+    if (isAdmin) {
+      div.draggable = true;
+      div.addEventListener('dragstart', e => {
+        dragSrcId = ch.id;
+        div.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      div.addEventListener('dragend', () => {
+        div.classList.remove('dragging');
+        list.querySelectorAll('.chapter-item').forEach(el => el.classList.remove('drag-over'));
+      });
+      div.addEventListener('dragover', e => {
+        e.preventDefault();
+        if (dragSrcId === ch.id) return;
+        const src = state.chapters.find(c => c.id === dragSrcId);
+        const dst = ch;
+        if (!src || (src.parentId || null) !== (dst.parentId || null)) return; // 같은 부모끼리만
+        e.dataTransfer.dropEffect = 'move';
+        list.querySelectorAll('.chapter-item').forEach(el => el.classList.remove('drag-over'));
+        div.classList.add('drag-over');
+      });
+      div.addEventListener('dragleave', () => div.classList.remove('drag-over'));
+      div.addEventListener('drop', e => {
+        e.preventDefault();
+        div.classList.remove('drag-over');
+        if (!dragSrcId || dragSrcId === ch.id) return;
+        const src = state.chapters.find(c => c.id === dragSrcId);
+        const dst = ch;
+        if (!src || (src.parentId || null) !== (dst.parentId || null)) return;
+        // 같은 부모의 형제 목록에서 순서 교환
+        const siblings = sortedChildren(src.parentId || null);
+        const srcIdx = siblings.findIndex(c => c.id === dragSrcId);
+        const dstIdx = siblings.findIndex(c => c.id === ch.id);
+        if (srcIdx === -1 || dstIdx === -1) return;
+        siblings.splice(srcIdx, 1);
+        siblings.splice(dstIdx, 0, src);
+        saveOrder(siblings);
+        renderSidebar();
+      });
+    }
+
     list.appendChild(div);
 
-    // 자식 렌더 (재귀) — createdAt 정렬
-    const children = state.chapters.filter(c => c.parentId === ch.id)
-      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    children.forEach((child, ci) => renderNode(child, ci));
+    // 자식 렌더 (재귀) — order 정렬
+    sortedChildren(ch.id).forEach((child, ci) => renderNode(child, ci));
   }
 
   // 프롤로그 (관리자만 편집, 항상 맨 위)
@@ -1927,9 +2056,8 @@ function renderSidebar() {
 
   renderSpecialItem('__prologue__', '프롤로그', '📖');
 
-  // 루트(대단원, parentId=null) 부터 createdAt 순
-  const roots = state.chapters.filter(c => !c.parentId || c.parentId === null)
-    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  // 루트(대단원, parentId=null) — order 정렬
+  const roots = sortedChildren(null);
   roots.forEach((ch, i) => renderNode(ch, i));
 
   renderSpecialItem('__epilogue__', '에필로그', '📕');
@@ -2000,7 +2128,7 @@ function renderEditorList() {
     const dlBtn = document.getElementById('download-chapter-btn');
     if (dlBtn) dlBtn.style.display = 'none';
     document.getElementById('editor-chapter-title').textContent = `📚 ${label} (관리자 전용)`;
-    initQuillEditor();
+    initToastEditor();
     setMdValue(special.content || '');
     editorDirty = false;
     livePreview();
@@ -2075,7 +2203,7 @@ function renderEditorList() {
   delBtn.style.display = (isAdmin || canEdit(ch)) ? '' : 'none';
   statusSel.style.display = hasContent ? '' : 'none';
   if (dlChBtn) dlChBtn.style.display = hasContent ? '' : 'none';
-  initQuillEditor();
+  initToastEditor();
   document.getElementById('editor-chapter-title').textContent = ch.title || '(제목 없음)';
   setMdValue(ch.content || '');
   editorDirty = false;
@@ -2306,7 +2434,12 @@ function saveChapter() {
   }
   const ch = state.chapters.find(c => c.id === state.currentChapterId);
   if (!ch) return;
-  ch.content = getMdValue();
+  const newContent = getMdValue();
+  // 안전 장치: 기존 내용이 있는데 에디터가 비어있으면 저장 차단
+  if (!newContent.trim() && ch.content && ch.content.trim()) {
+    if (!confirm('에디터 내용이 비어있습니다. 기존 내용이 삭제됩니다. 계속하시겠습니까?')) return;
+  }
+  ch.content = newContent;
   ch.updatedAt = new Date().toISOString();
   editorDirty = false;
   save();
@@ -2354,14 +2487,16 @@ function handleFileUpload(e) {
     reader.onload = async (ev) => {
       try {
         const arrayBuffer = ev.target.result;
-        // mammoth: HTML로 변환 후 마크다운으로 재변환
+        // mammoth: HTML로 변환 후 Quill에 직접 붙여넣기
         const result = await mammoth.convertToHtml({ arrayBuffer });
         const html = result.value;
         const current = getMdValue();
         if (current.trim()) {
           if (!confirm('현재 내용을 업로드한 Word 파일로 교체할까요?')) return;
         }
-        if (quillEditor) quillEditor.clipboard.dangerouslyPasteHTML(html || '');
+        if (quillEditor) {
+          quillEditor.clipboard.dangerouslyPasteHTML(html || '');
+        }
         editorDirty = true;
         livePreview();
         if (result.messages.length) console.warn('mammoth 경고:', result.messages);
@@ -2376,7 +2511,8 @@ function handleFileUpload(e) {
   // .txt / .md 파일
   const reader = new FileReader();
   reader.onload = (ev) => {
-    document.getElementById('md-editor').value = ev.target.result;
+    setMdValue(ev.target.result);
+    editorDirty = true;
     livePreview();
   };
   reader.readAsText(file, 'UTF-8');
@@ -2445,7 +2581,21 @@ function renderDashboard() {
   if (!total) { chDiv.innerHTML = '<div style="color:var(--muted);font-size:13px;">아직 단원이 없습니다. 단원을 추가하세요.</div>'; }
   else {
     const labels = { done: '완료', prog: '작업 중', none: '미작성' };
-    const sortedChapters = [...state.chapters].sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+    // 사이드바와 동일한 DFS 순서로 챕터 평탄화
+    function flattenTree(parentId) {
+      const children = state.chapters
+        .filter(c => (c.parentId || null) === (parentId || null))
+        .sort((a, b) => {
+          const ao = a.order !== undefined ? a.order : Infinity;
+          const bo = b.order !== undefined ? b.order : Infinity;
+          if (ao !== bo) return ao - bo;
+          return new Date(a.createdAt) - new Date(b.createdAt);
+        });
+      let result = [];
+      children.forEach(ch => { result.push(ch); result = result.concat(flattenTree(ch.id)); });
+      return result;
+    }
+    const sortedChapters = flattenTree(null);
     chDiv.innerHTML = sortedChapters.map((ch,i) => {
       const wc = ch.content ? ch.content.split(/\s+/).filter(Boolean).length : 0;
       const maxWc = Math.max(...sortedChapters.map(c => (c.content||'').split(/\s+/).filter(Boolean).length), 1);
@@ -3239,13 +3389,15 @@ function refreshPickerGrid() {
 
 async function processMediaFiles(files, silent) {
   if (!silent) fbStatus('📤 업로드 중...', '#f59e0b', 10000);
+  // 현재 로그인 집필자 정보
   const uploader = state.authors.find(a => a.id === currentUserId);
   const authorId   = currentUserId || 'admin';
   const authorName = isAdmin ? '관리자' : (uploader ? uploader.name : '알 수 없음');
+
   for (const file of files) {
     if (!file.type.startsWith('image/') && file.type !== 'application/pdf') continue;
     if (!legacyMode && fbStorage) {
-      // Firebase Storage 업로드 (집필진별 경로)
+      // Firebase Storage 업로드 — 집필자별 경로
       try {
         const fileId = uid();
         const storagePath = `media/${authorId}/${fileId}_${file.name}`;
@@ -3262,8 +3414,7 @@ async function processMediaFiles(files, silent) {
         const reader = new FileReader();
         reader.onload = ev => {
           const media = getMedia();
-          const fileId = uid();
-          media.unshift({ id: fileId, name: file.name, url: ev.target.result, authorId, authorName, date: new Date().toISOString() });
+          media.unshift({ id: uid(), name: file.name, url: ev.target.result, authorId, authorName, date: new Date().toISOString() });
           saveMedia(media);
           resolve();
         };
@@ -3275,7 +3426,8 @@ async function processMediaFiles(files, silent) {
   renderMediaLibrary();
 }
 
-let mediaShowAll = false;
+let mediaShowAll = false; // false = 내 그림만, true = 전체
+
 function toggleMediaFilter() {
   mediaShowAll = !mediaShowAll;
   const btn = document.getElementById('media-filter-btn');
@@ -3286,34 +3438,40 @@ function toggleMediaFilter() {
 function renderMediaLibrary() {
   let media = getMedia();
   const myId = currentUserId || 'admin';
+
+  // 필터
   if (!mediaShowAll) {
-    const mine = media.filter(m => (m.authorId || 'admin') === myId);
-    if (mine.length) media = mine;
+    const myMedia = media.filter(m => (m.authorId || 'admin') === myId);
+    // 내 그림이 없으면 전체 보기로 fallback
+    media = myMedia.length ? myMedia : media;
   }
+
+  // 필터 라벨
   const label = document.getElementById('media-filter-label');
   if (label) label.textContent = mediaShowAll ? `전체 ${media.length}개` : `내 그림 ${media.length}개`;
+
   const grid = document.getElementById('media-grid');
   if (!media.length) {
-    grid.innerHTML = '<div class="media-empty">이미지가 없습니다.<br>위 영역에 드래그하거나 버튼을 눌러 업로드하세요.</div>';
+    grid.innerHTML = '<div class="media-empty">업로드된 이미지가 없습니다.<br>위 영역에 드래그하거나 버튼을 눌러 업로드하세요.</div>';
     return;
   }
   grid.innerHTML = media.map(m => {
     const isPdf = m.name && m.name.toLowerCase().endsWith('.pdf');
     const thumb = isPdf
       ? `<div style="width:100%;height:110px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--bg);">📄</div>`
-      : `<img class="media-thumb" src="${m.url||m.dataUrl||''}" alt="${escHtml(m.name)}" loading="lazy">`;
+      : `<img class="media-thumb" src="${m.url||m.dataUrl||''}" alt="${escHtml(m.name)}" loading="lazy" onerror="this.src='';this.style.background='var(--bg)';this.style.minHeight='80px'">`;
+    const uploaderTag = m.authorName ? `<div style="font-size:10px;color:var(--muted);margin-top:1px;">📤 ${escHtml(m.authorName)}</div>` : '';
     const canDel = isAdmin || (m.authorId || 'admin') === myId;
-    const authorLabel = m.authorName ? `<div class="media-date" style="color:var(--accent)">👤 ${escHtml(m.authorName)}</div>` : '';
     return `<div class="media-card">
       ${thumb}
       <div class="media-info">
         <div class="media-name" title="${escHtml(m.name)}">${escHtml(m.name)}</div>
         <div class="media-date">${formatDate(m.date)}</div>
-        ${authorLabel}
+        ${uploaderTag}
       </div>
       <div class="media-actions">
         <button class="media-action" onclick="insertMediaToEditor('${m.id}')" title="편집기에 삽입">삽입</button>
-        <button class="media-action" onclick="copyMediaMd('${m.id}')" title="마크다운 복사">복사</button>
+        <button class="media-action" onclick="copyMediaMd('${m.id}')" title="URL 복사">복사</button>
         ${canDel ? `<button class="media-action" onclick="deleteMedia('${m.id}')" title="삭제" style="color:var(--danger)">삭제</button>` : ''}
       </div>
     </div>`;
@@ -3330,22 +3488,20 @@ function getMediaMd(id) {
 function insertMediaToEditor(id) {
   const md = getMediaMd(id);
   if (!md) return;
-  if (quillEditor) {
-    const html = marked.parse(md);
-    const range = quillEditor.getSelection(true);
-    const idx = range ? range.index : quillEditor.getLength();
-    quillEditor.clipboard.dangerouslyPasteHTML(idx, html);
-    editorDirty = true;
-  }
+  insertIntoEditor(md);
   if (currentPage === 'media') showPage('editor');
 }
 function copyMediaMd(id) {
-  navigator.clipboard.writeText(getMediaMd(id)).then(() => alert('마크다운 코드가 복사됐습니다.'));
+  const m = getMedia().find(m => m.id === id);
+  if (!m) return;
+  const url = m.url || m.dataUrl || '';
+  navigator.clipboard.writeText(url).then(() => fbStatus('✓ URL 복사됨', '#22c55e', 1500));
 }
 async function deleteMedia(id) {
   if (!confirm('이미지를 삭제하시겠습니까?\n(Storage에서도 완전히 삭제됩니다)')) return;
   const all = getMedia();
   const item = all.find(m => m.id === id);
+  // Firebase Storage 실제 파일 삭제
   if (item && item.storagePath && fbStorage) {
     try { await fbStorage.ref(item.storagePath).delete(); } catch(e) { console.warn('Storage 삭제 실패:', e); }
   }
@@ -3424,9 +3580,7 @@ function updateTablePreview() {
 }
 
 function insertTableToEditor() {
-  const ta = document.getElementById('md-editor');
-  insertAtCursor(ta, getTableMd());
-  livePreview();
+  insertIntoEditor(getTableMd());
   closeModal('table-editor');
 }
 
@@ -3656,11 +3810,16 @@ function renderPreview() {
   document.getElementById('preview-book-sub').textContent = '';
   const container = document.getElementById('preview-chapters');
 
-  // 루트 → 계층 순서대로 정렬 (createdAt 기준)
+  // 루트 → 계층 순서대로 정렬 (order 필드 우선, 없으면 createdAt)
   function getChildren(parentId) {
     return state.chapters
       .filter(c => (c.parentId || null) === (parentId || null))
-      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      .sort((a, b) => {
+        const ao = (a.order != null) ? a.order : Infinity;
+        const bo = (b.order != null) ? b.order : Infinity;
+        if (ao !== bo) return ao - bo;
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      });
   }
 
   let html = '';
@@ -3936,33 +4095,52 @@ function triggerBlobDownload(blob, filename) {
 }
 
 // 내 단원 Word 다운로드
+// 현재 단원 Word 다운로드 (에디터의 실시간 내용 기준 — 저장 전이어도 반영)
 async function downloadMyChapterDocx() {
   if (!window.JSZip) { alert('Word 라이브러리(JSZip) 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+  const rootChapter = state.chapters.find(c => c.id === state.currentChapterId);
+  if (!rootChapter) { alert('먼저 왼쪽에서 단원을 선택해주세요.'); return; }
+
+  // 에디터의 현재 내용(저장 전 포함)을 가져옴
+  const liveContent = getMdValue();
+
+  // 현재 챕터 + 하위 챕터 수집
+  const chapters = [];
+  function collect(parentId) {
+    state.chapters
+      .filter(c => (c.parentId || null) === (parentId || null))
+      .sort((a, b) => {
+        const ao = a.order !== undefined ? a.order : Infinity;
+        const bo = b.order !== undefined ? b.order : Infinity;
+        return ao !== bo ? ao - bo : new Date(a.createdAt) - new Date(b.createdAt);
+      })
+      .forEach(ch => { chapters.push(ch); collect(ch.id); });
+  }
+  chapters.push(rootChapter);
+  collect(rootChapter.id);
+
   const author = state.authors.find(a => a.id === currentUserId);
   const authorName = author ? author.name : (isAdmin ? '관리자' : '집필자');
-  // 현재 선택된 챕터와 그 하위 챕터만 수집
-  const rootChapter = state.chapters.find(c => c.id === state.currentChapterId);
-  if (!rootChapter) { alert('먼저 단원을 선택해주세요.'); return; }
-  const myChapters = [];
-  function collect(parentId) {
-    state.chapters.filter(c => (c.parentId||null) === (parentId||null))
-      .sort((a,b) => new Date(a.createdAt)-new Date(b.createdAt))
-      .forEach(ch => { myChapters.push(ch); collect(ch.id); });
-  }
-  myChapters.push(rootChapter);
-  collect(rootChapter.id);
-  if (!myChapters.length) { alert('작성된 단원이 없습니다.'); return; }
+
+  // 제목 페이지
   let body = `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="48"/></w:rPr><w:t>${escXml(state.book.title)}</w:t></w:r></w:p>`;
   if (state.book.sub) body += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="24"/><w:color w:val="555555"/></w:rPr><w:t>${escXml(state.book.sub)}</w:t></w:r></w:p>`;
-  body += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:color w:val="888888"/></w:rPr><w:t>집필: ${escXml(authorName)}</w:t></w:r></w:p><w:p/><w:p/>`;
-  for (const ch of myChapters) {
+  body += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:color w:val="888888"/></w:rPr><w:t>집필: ${escXml(authorName)}</w:t></w:r></w:p>`;
+  const now = new Date().toLocaleDateString('ko-KR');
+  body += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/><w:color w:val="aaaaaa"/></w:rPr><w:t>다운로드: ${now}</w:t></w:r></w:p><w:p/><w:p/>`;
+
+  // 챕터 내용 — 현재 편집 중인 챕터는 에디터 실시간 내용 사용
+  for (const ch of chapters) {
     const styleId = 'Heading' + Math.min(ch.level || 1, 4);
     body += `<w:p><w:pPr><w:pStyle w:val="${styleId}"/></w:pPr><w:r><w:t>${escXml(ch.title)}</w:t></w:r></w:p>`;
-    if (ch.content) body += mdToOoxmlBody(ch.content);
+    const content = (ch.id === state.currentChapterId) ? liveContent : (ch.content || '');
+    if (content) body += mdToOoxmlBody(content);
     body += '<w:p/>';
   }
+
+  const safeTitle = rootChapter.title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
   const blob = await buildDocxBlob(body);
-  if (blob) triggerBlobDownload(blob, `${authorName}_${state.book.title}.docx`);
+  if (blob) triggerBlobDownload(blob, `${safeTitle}.docx`);
 }
 
 // 전체 책 Word 다운로드
