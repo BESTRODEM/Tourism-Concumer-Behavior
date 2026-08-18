@@ -718,7 +718,6 @@
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('dashboard')">대시보드</button>
     <button class="nav-tab" onclick="showPage('editor')">편집</button>
-    <button class="nav-tab" onclick="showPage('media')">🖼 그림</button>
     <button class="nav-tab" onclick="showPage('preview')">전체 미리보기</button>
     <button class="nav-tab" onclick="showPage('authors')">집필진</button>
   </div>
@@ -833,7 +832,7 @@
           <option value="done">완료</option>
         </select>
         <button class="editor-tool-btn" onclick="openModal('table-editor')">⊞ 표 삽입</button>
-        <button class="editor-tool-btn" onclick="showPage('media')">🖼 그림</button>
+        <button class="editor-tool-btn" onclick="showPage('media')">📤 그림 업로드</button>
         <button class="editor-tool-btn" onclick="openMediaPicker()">🖼 그림 삽입</button>
         <div class="upload-area" style="padding:5px 12px;border-width:1px;display:inline-block;" onclick="document.getElementById('file-upload').click()">
           📁 파일 업로드
@@ -905,7 +904,8 @@
     <!-- MEDIA LIBRARY -->
     <div id="page-media">
       <div class="media-toolbar">
-        <h2>🖼 미디어 라이브러리</h2>
+        <button class="nav-btn" onclick="showPage('editor')" style="font-size:12px;">← 편집으로</button>
+        <h2 style="margin-left:8px;">🖼 그림 업로드</h2>
         <div class="gap-spacer"></div>
         <span id="media-filter-label" style="font-size:12px;color:var(--muted);"></span>
         <button class="nav-btn" id="media-filter-btn" onclick="toggleMediaFilter()">👤 내 그림만</button>
@@ -1748,7 +1748,7 @@ function showPage(p) {
     el.style.display = id === p ? (id === 'editor' ? 'flex' : 'block') : 'none';
   });
   // main tabs (exclude intranet which is a separate button)
-  const mainTabs = ['dashboard','editor','media','preview','authors'];
+  const mainTabs = ['dashboard','editor','preview','authors'];
   document.querySelectorAll('.nav-tabs .nav-tab').forEach((t,i) => {
     t.classList.toggle('active', mainTabs[i] === p);
   });
