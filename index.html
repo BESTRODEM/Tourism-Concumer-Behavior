@@ -2460,10 +2460,21 @@ function renderDashboard() {
   if (!total) { chDiv.innerHTML = '<div style="color:var(--muted);font-size:13px;">아직 단원이 없습니다. 단원을 추가하세요.</div>'; }
   else {
     const labels = { done: '완료', prog: '작업 중', none: '미작성' };
-    const sortedChapters = [...state.chapters].sort((a,b) => {
-      if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
-      return new Date(a.createdAt) - new Date(b.createdAt);
-    });
+    // 사이드바와 동일한 DFS 순서로 챕터 평탄화
+    function flattenTree(parentId) {
+      const children = state.chapters
+        .filter(c => (c.parentId || null) === (parentId || null))
+        .sort((a, b) => {
+          const ao = a.order !== undefined ? a.order : Infinity;
+          const bo = b.order !== undefined ? b.order : Infinity;
+          if (ao !== bo) return ao - bo;
+          return new Date(a.createdAt) - new Date(b.createdAt);
+        });
+      let result = [];
+      children.forEach(ch => { result.push(ch); result = result.concat(flattenTree(ch.id)); });
+      return result;
+    }
+    const sortedChapters = flattenTree(null);
     chDiv.innerHTML = sortedChapters.map((ch,i) => {
       const wc = ch.content ? ch.content.split(/\s+/).filter(Boolean).length : 0;
       const maxWc = Math.max(...sortedChapters.map(c => (c.content||'').split(/\s+/).filter(Boolean).length), 1);
