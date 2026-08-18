@@ -7,8 +7,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/toastui-editor.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/toastui-editor-all.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
@@ -320,16 +320,18 @@
     font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.7;
     background: #fafbfc; color: var(--text);
   }
-  /* ── TOAST UI EDITOR ── */
-  #md-editor { flex:1; overflow:hidden; min-height:0; }
-  .toastui-editor-defaultUI { height:100% !important; border:none !important; border-radius:0 !important; display:flex; flex-direction:column; }
-  .toastui-editor-toolbar { background:var(--bg) !important; border-bottom:1px solid var(--border) !important; flex-shrink:0 !important; }
-  .toastui-editor-main { flex:1 !important; overflow:hidden !important; }
-  .toastui-editor-ww-container, .toastui-editor-ww-wrapper { height:100% !important; }
-  .toastui-editor-md-container { height:100% !important; }
-  .toastui-editor-md-preview { background:var(--surface) !important; }
-  .ProseMirror { padding:20px !important; font-family:'Segoe UI',-apple-system,sans-serif !important; font-size:14px !important; line-height:1.85 !important; min-height:300px !important; color:var(--text) !important; }
-  .toastui-editor-mode-switch { border-top: 1px solid var(--border) !important; background:var(--bg) !important; }
+  /* ── QUILL WYSIWYG EDITOR ── */
+  #md-editor { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .ql-toolbar.ql-snow { flex-shrink:0 !important; background:var(--bg) !important; border:none !important; border-bottom:1px solid var(--border) !important; padding:6px 8px !important; }
+  .ql-container.ql-snow { flex:1 !important; border:none !important; overflow:auto !important; min-height:0 !important; font-family:'Segoe UI',-apple-system,sans-serif !important; font-size:14px !important; }
+  .ql-editor { min-height:300px; line-height:1.85 !important; color:var(--text) !important; padding:20px !important; }
+  .ql-editor.ql-blank::before { color:var(--muted) !important; font-style:normal !important; }
+  .ql-snow .ql-stroke { stroke:var(--text) !important; opacity:0.6; }
+  .ql-snow .ql-fill { fill:var(--text) !important; opacity:0.6; }
+  .ql-snow .ql-picker { color:var(--text) !important; }
+  .ql-snow .ql-picker-options { background:var(--surface) !important; border:1px solid var(--border) !important; }
+  .ql-snow button:hover .ql-stroke, .ql-snow button.ql-active .ql-stroke { stroke:var(--accent) !important; opacity:1; }
+  .ql-snow button:hover .ql-fill, .ql-snow button.ql-active .ql-fill { fill:var(--accent) !important; opacity:1; }
   .editor-divider { width: 1px; background: var(--border); flex-shrink: 0; }
   .preview-pane { flex: 1; overflow-y: auto; padding: 24px; font-size: 15px; line-height: 1.8; }
   .preview-pane h1 { font-size: 24px; margin-bottom: 16px; }
@@ -1382,76 +1384,91 @@ let isAdmin = false;
 let currentUserId = null; // 현재 로그인한 집필자 ID (null = 미선택)
 let editorDirty = false;  // 미저장 변경 여부
 let pendingNavAction = null; // 미저장 팝업 확인 후 실행할 동작
-let toastEditor = null;       // Toast UI WYSIWYG 에디터 인스턴스
-let editorFallback = false;   // Toast UI 로딩 실패 시 textarea 사용
+let quillEditor = null;       // Quill WYSIWYG 에디터 인스턴스
+
+// ── Quill HTML → 마크다운 변환 (저장/Word 출력용) ──
+function domNodeToMd(node) {
+  if (node.nodeType === 3) return node.textContent;
+  if (node.nodeType !== 1) return '';
+  const tag = node.tagName.toLowerCase();
+  const inner = Array.from(node.childNodes).map(domNodeToMd).join('');
+  switch(tag) {
+    case 'p': { const t = inner.trim(); return t ? t + '\n\n' : ''; }
+    case 'br': return '\n';
+    case 'strong': case 'b': return inner ? `**${inner}**` : '';
+    case 'em': case 'i': return inner ? `*${inner}*` : '';
+    case 's': return inner ? `~~${inner}~~` : '';
+    case 'u': return inner;
+    case 'h1': return `# ${inner.trim()}\n\n`;
+    case 'h2': return `## ${inner.trim()}\n\n`;
+    case 'h3': return `### ${inner.trim()}\n\n`;
+    case 'h4': return `#### ${inner.trim()}\n\n`;
+    case 'blockquote': return inner.trim().split('\n').map(l => `> ${l}`).join('\n') + '\n\n';
+    case 'pre': return `\`\`\`\n${inner}\`\`\`\n\n`;
+    case 'code': return node.closest('pre') ? inner : `\`${inner}\``;
+    case 'ul': {
+      const items = Array.from(node.querySelectorAll(':scope > li')).map(li => `- ${Array.from(li.childNodes).map(domNodeToMd).join('').trim()}`);
+      return items.join('\n') + '\n\n';
+    }
+    case 'ol': {
+      const items = Array.from(node.querySelectorAll(':scope > li')).map((li, i) => `${i+1}. ${Array.from(li.childNodes).map(domNodeToMd).join('').trim()}`);
+      return items.join('\n') + '\n\n';
+    }
+    case 'li': return inner;
+    case 'a': return `[${inner}](${node.getAttribute('href') || ''})`;
+    case 'img': return `![${node.getAttribute('alt') || ''}](${node.getAttribute('src') || ''})`;
+    case 'hr': return '---\n\n';
+    default: return inner;
+  }
+}
+function quillHtmlToMd(html) {
+  if (!html || html.trim() === '<p><br></p>' || !html.trim()) return '';
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  return domNodeToMd(doc.body.firstChild).replace(/\n{3,}/g, '\n\n').trim();
+}
 
 function getMdValue() {
-  if (editorFallback) {
-    const ta = document.getElementById('md-editor-ta');
-    return ta ? ta.value : '';
-  }
-  return toastEditor ? toastEditor.getMarkdown() : '';
+  if (!quillEditor) return '';
+  return quillHtmlToMd(quillEditor.root.innerHTML);
 }
 function setMdValue(content) {
+  if (!quillEditor) return;
   const md = content || '';
-  if (editorFallback) {
-    const ta = document.getElementById('md-editor-ta');
-    if (ta) ta.value = md;
-    return;
-  }
-  if (!toastEditor) return;
-  toastEditor.setMarkdown(md, false);
-  // changeMode(wysiwyg) 50ms 타임아웃 이후에도 내용 보장
-  setTimeout(() => {
-    if (toastEditor) toastEditor.setMarkdown(md, false);
-  }, 80);
+  const html = md ? marked.parse(md) : '';
+  quillEditor.clipboard.dangerouslyPasteHTML(html || '');
 }
 function insertIntoEditor(text) {
-  if (editorFallback) {
-    const ta = document.getElementById('md-editor-ta');
-    if (ta) { insertAtCursor(ta, text); editorDirty = true; livePreview(); }
-  } else if (toastEditor) {
-    toastEditor.insertText('\n' + text + '\n');
-    editorDirty = true; livePreview();
-  }
+  if (!quillEditor) return;
+  const html = text ? marked.parse(text) : '';
+  const range = quillEditor.getSelection(true);
+  const idx = range ? range.index : quillEditor.getLength();
+  quillEditor.clipboard.dangerouslyPasteHTML(idx, html);
+  editorDirty = true; livePreview();
 }
-function initToastEditor() {
-  if (toastEditor || editorFallback) return;
+function initToastEditor() { initQuillEditor(); } // 하위호환 별칭
+function initQuillEditor() {
+  if (quillEditor) return;
   const el = document.getElementById('md-editor');
-  try {
-    if (typeof toastui === 'undefined') throw new Error('toastui not loaded');
-    const parentH = el.parentElement ? el.parentElement.getBoundingClientRect().height : 0;
-    const editorH = parentH > 150 ? parentH + 'px' : 'calc(100vh - 220px)';
-    toastEditor = new toastui.Editor({
-      el: el,
-      height: editorH,
-      initialEditType: 'wysiwyg',
-      previewStyle: 'tab',
-      hideModeSwitch: false,
-      toolbarItems: [
-        ['heading', 'bold', 'italic', 'strike'],
-        ['hr', 'quote'],
-        ['ul', 'ol', 'task'],
-        ['table'],
-        ['link'],
-        ['code', 'codeblock']
-      ],
-      events: {
-        change: () => { editorDirty = true; livePreview(); }
-      }
-    });
-    // WYSIWYG 모드 강제
-    setTimeout(() => { if (toastEditor) toastEditor.changeMode('wysiwyg'); }, 50);
-  } catch(e) {
-    console.warn('Toast UI 초기화 실패, textarea 대체 사용:', e);
-    editorFallback = true;
-    el.innerHTML = `<textarea id="md-editor-ta"
-      style="flex:1;width:100%;height:100%;resize:none;border:none;outline:none;
-             padding:20px;font-family:'Segoe UI',-apple-system,sans-serif;
-             font-size:14px;line-height:1.85;background:#fafbfc;color:var(--text);"
-      oninput="editorDirty=true;livePreview()"
-      placeholder="내용을 입력하세요..."></textarea>`;
+  if (!el || typeof Quill === 'undefined') {
+    console.warn('Quill 라이브러리 미로딩');
+    return;
   }
+  el.innerHTML = '';
+  quillEditor = new Quill(el, {
+    theme: 'snow',
+    placeholder: '내용을 입력하세요...',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['blockquote', 'code-block'],
+        ['link', 'image'],
+        ['clean']
+      ]
+    }
+  });
+  quillEditor.on('text-change', () => { editorDirty = true; livePreview(); });
 }
 
 // ── CHAPTER MIGRATION ── (기존 챕터에 level/parentId 자동 부여)
@@ -2467,16 +2484,16 @@ function handleFileUpload(e) {
     reader.onload = async (ev) => {
       try {
         const arrayBuffer = ev.target.result;
-        // mammoth: HTML로 변환 후 마크다운으로 재변환
+        // mammoth: HTML로 변환 후 Quill에 직접 붙여넣기
         const result = await mammoth.convertToHtml({ arrayBuffer });
         const html = result.value;
-        // HTML → 간단 마크다운 변환
-        const md = htmlToMd(html);
         const current = getMdValue();
         if (current.trim()) {
           if (!confirm('현재 내용을 업로드한 Word 파일로 교체할까요?')) return;
         }
-        setMdValue(md);
+        if (quillEditor) {
+          quillEditor.clipboard.dangerouslyPasteHTML(html || '');
+        }
         editorDirty = true;
         livePreview();
         if (result.messages.length) console.warn('mammoth 경고:', result.messages);
