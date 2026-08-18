@@ -3767,10 +3767,15 @@ function checkSession() {
     const badge = document.getElementById('part-badge');
     if (badge) { badge.textContent = `Part ${currentPart} ${currentPart===1?'소비자편':'공급자편'}`; badge.style.display=''; }
   }
+  // 관리자 세션 복원 (login-user가 빈 문자열일 수 있으므로 admin 먼저 확인)
+  if (admin === '1') {
+    isAdmin = true;
+    if (user) currentUserId = user;
+    return !!part;
+  }
   if (user) {
     currentUserId = user;
-    if (admin === '1') isAdmin = true;
-    return !!part; // Part 선택까지 완료된 경우만 true
+    return !!part;
   }
   return false;
 }
